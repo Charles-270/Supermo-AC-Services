@@ -1,0 +1,152 @@
+/**
+ * Admin Dashboard
+ * Platform oversight, analytics, user management
+ */
+
+import { useAuth } from '@/hooks/useAuth';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Shield, Users, BarChart3, Settings, Activity } from 'lucide-react';
+
+export function AdminDashboard() {
+  const { profile, signOut } = useAuth();
+
+  return (
+    <div className="min-h-screen bg-gradient-cool">
+      {/* Header */}
+      <header className="bg-white border-b border-neutral-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Shield className="h-8 w-8 text-primary-500" />
+              <div>
+                <h1 className="text-2xl font-bold text-neutral-900">Admin Console</h1>
+                <p className="text-sm text-neutral-600">Welcome, {profile?.displayName}!</p>
+              </div>
+            </div>
+            <Button variant="outline" onClick={signOut}>
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Platform Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Total Users</CardDescription>
+              <CardTitle className="text-3xl">1,234</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Active Bookings</CardDescription>
+              <CardTitle className="text-3xl">89</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Revenue (Month)</CardDescription>
+              <CardTitle className="text-3xl">GH₵ 125K</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Avg. Response Time</CardDescription>
+              <CardTitle className="text-3xl">2.4h</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+
+        {/* Management Sections */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary-500" />
+                User Management
+              </CardTitle>
+              <CardDescription>
+                Manage customers, technicians, suppliers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full">Manage Users</Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-accent-500" />
+                Analytics
+              </CardTitle>
+              <CardDescription>
+                Platform performance and metrics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="secondary" className="w-full">
+                View Analytics
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-neutral-600" />
+                Platform Settings
+              </CardTitle>
+              <CardDescription>
+                Configure platform settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" className="w-full">
+                Settings
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary-500" />
+              Recent Platform Activity
+            </CardTitle>
+            <CardDescription>Latest user actions and system events</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center gap-4 p-3 border border-neutral-200 rounded-lg">
+                <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-primary-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">New user registered</p>
+                  <p className="text-xs text-neutral-600">Customer • 5 minutes ago</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 p-3 border border-neutral-200 rounded-lg">
+                <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center">
+                  <Activity className="h-5 w-5 text-success" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Service booking completed</p>
+                  <p className="text-xs text-neutral-600">Job #1234 • 1 hour ago</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
+    </div>
+  );
+}

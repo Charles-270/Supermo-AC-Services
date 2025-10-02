@@ -1,157 +1,79 @@
-import { useState } from 'react'
-import { formatCurrency } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Snowflake, Thermometer, Wind } from 'lucide-react'
+/**
+ * Main App Component
+ * React Router with protected routes for 5 user dashboards
+ */
+
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from '@/hooks/useAuth';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { LandingPage } from '@/pages/LandingPage';
+import { CustomerDashboard } from '@/pages/dashboards/CustomerDashboard';
+import { TechnicianDashboard } from '@/pages/dashboards/TechnicianDashboard';
+import { SupplierDashboard } from '@/pages/dashboards/SupplierDashboard';
+import { AdminDashboard } from '@/pages/dashboards/AdminDashboard';
+import { TraineeDashboard } from '@/pages/dashboards/TraineeDashboard';
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <div className="min-h-screen bg-gradient-cool flex items-center justify-center p-6">
-      <div className="max-w-4xl w-full space-y-6">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Snowflake className="h-10 w-10 text-primary-600" />
-            <h1 className="text-4xl font-bold text-primary-600">
-              Supremo AC Services
-            </h1>
-          </div>
-          <p className="text-neutral-600 text-lg">
-            Digital Platform - HVAC Services in Ghana
-          </p>
-          <div className="flex gap-2 justify-center mt-4">
-            <Badge variant="success">✓ Production Ready</Badge>
-            <Badge variant="default">React 19</Badge>
-            <Badge variant="secondary">ShadCN UI</Badge>
-          </div>
-        </div>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LandingPage />} />
 
-        {/* Demo Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Interactive Demo Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Thermometer className="h-5 w-5 text-primary-500" />
-                Interactive Demo
-              </CardTitle>
-              <CardDescription>
-                Test our ShadCN UI components with HVAC branding
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email Address</label>
-                <Input type="email" placeholder="customer@example.com" />
-              </div>
+          {/* Protected Dashboard Routes */}
+          <Route
+            path="/dashboard/customer"
+            element={
+              <ProtectedRoute requiredRole="customer">
+                <CustomerDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-              <Button
-                onClick={() => setCount((count) => count + 1)}
-                className="w-full"
-              >
-                Clicked {count} times
-              </Button>
+          <Route
+            path="/dashboard/technician"
+            element={
+              <ProtectedRoute requiredRole="technician">
+                <TechnicianDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="secondary" size="sm">
-                  <Wind className="mr-2 h-4 w-4" />
-                  Secondary
-                </Button>
-                <Button variant="outline" size="sm">
-                  Outline
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <Route
+            path="/dashboard/supplier"
+            element={
+              <ProtectedRoute requiredRole="supplier">
+                <SupplierDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-          {/* Features Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Platform Features</CardTitle>
-              <CardDescription>
-                What we've built so far
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Vite + React 19</span>
-                <Badge variant="success">✓</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">TailwindCSS V3</span>
-                <Badge variant="success">✓</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">TypeScript Paths (@/)</span>
-                <Badge variant="success">✓</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">ShadCN UI Components</span>
-                <Badge variant="success">✓</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Ghana Localization</span>
-                <Badge variant="success">✓</Badge>
-              </div>
-              <div className="pt-2 border-t">
-                <p className="text-sm text-neutral-500">
-                  Example price: <span className="font-semibold text-neutral-900">{formatCurrency(1500)}</span>
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          <Route
+            path="/dashboard/admin"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Color Palette Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>HVAC Color Scheme</CardTitle>
-            <CardDescription>
-              Cool blues for cooling & trust - optimized for brand identity
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="space-y-2">
-                <div className="h-20 bg-primary-500 rounded-md"></div>
-                <p className="text-xs font-medium text-center">Primary</p>
-                <p className="text-xs text-neutral-500 text-center">#0EA5E9</p>
-              </div>
-              <div className="space-y-2">
-                <div className="h-20 bg-accent-500 rounded-md"></div>
-                <p className="text-xs font-medium text-center">Accent</p>
-                <p className="text-xs text-neutral-500 text-center">#06B6D4</p>
-              </div>
-              <div className="space-y-2">
-                <div className="h-20 bg-success rounded-md"></div>
-                <p className="text-xs font-medium text-center">Success</p>
-                <p className="text-xs text-neutral-500 text-center">#10B981</p>
-              </div>
-              <div className="space-y-2">
-                <div className="h-20 bg-warning rounded-md"></div>
-                <p className="text-xs font-medium text-center">Warning</p>
-                <p className="text-xs text-neutral-500 text-center">#F59E0B</p>
-              </div>
-              <div className="space-y-2">
-                <div className="h-20 bg-error rounded-md"></div>
-                <p className="text-xs font-medium text-center">Error</p>
-                <p className="text-xs text-neutral-500 text-center">#EF4444</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          <Route
+            path="/dashboard/trainee"
+            element={
+              <ProtectedRoute requiredRole="trainee">
+                <TraineeDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Footer */}
-        <div className="text-center text-sm text-neutral-500">
-          <p>✓ Foundation complete - Ready for Firebase integration</p>
-        </div>
-      </div>
-    </div>
-  )
+          {/* Catch-all redirect */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
