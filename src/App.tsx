@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { cn, formatCurrency } from '@/lib/utils'
 
 function App() {
   const [count, setCount] = useState(0)
@@ -58,10 +59,25 @@ function App() {
           </div>
         </div>
 
-        {/* Status Badge */}
-        <div className="mt-6 text-center">
-          <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-success/10 text-success border border-success/20">
-            ✓ Tailwind CSS Configured
+        {/* Status Badges */}
+        <div className="mt-6 flex flex-wrap gap-3 justify-center">
+          <span className={cn(
+            "inline-flex items-center px-4 py-2 rounded-full text-sm font-medium",
+            "bg-success/10 text-success border border-success/20"
+          )}>
+            ✓ Tailwind CSS
+          </span>
+          <span className={cn(
+            "inline-flex items-center px-4 py-2 rounded-full text-sm font-medium",
+            "bg-primary-500/10 text-primary-600 border border-primary-500/20"
+          )}>
+            ✓ Path Aliases (@/)
+          </span>
+          <span className={cn(
+            "inline-flex items-center px-4 py-2 rounded-full text-sm font-medium",
+            "bg-accent-500/10 text-accent-600 border border-accent-500/20"
+          )}>
+            {formatCurrency(1500)}
           </span>
         </div>
       </div>
