@@ -1,68 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Root Variables - HVAC Theme */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --primary: 14 165 233; /* #0EA5E9 - Sky Blue */
+  --primary-dark: 2 132 199; /* #0284C7 */
+  --accent: 6 182 212; /* #06B6D4 - Cyan */
+  --success: 16 185 129; /* #10B981 */
+  --warning: 245 158 11; /* #F59E0B */
+  --error: 239 68 68; /* #EF4444 */
+  --neutral: 100 116 139; /* #64748B */
+
+  /* Typography */
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
+  /* Rendering optimizations */
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+/* Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
   min-height: 100vh;
+  background-color: theme('colors.neutral.50');
+  color: theme('colors.neutral.900');
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+/* Mobile-First Responsive Base */
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
   }
-  a:hover {
-    color: #747bff;
+}
+
+/* Custom Utilities for HVAC Platform */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
   }
-  button {
-    background-color: #f9f9f9;
+
+  .bg-gradient-primary {
+    background: linear-gradient(135deg, #0EA5E9 0%, #06B6D4 100%);
+  }
+
+  .bg-gradient-cool {
+    background: linear-gradient(180deg, #F0F9FF 0%, #E0F2FE 100%);
+  }
+}
+
+/* Component Patterns */
+@layer components {
+  .btn-primary {
+    @apply bg-primary-500 text-white px-4 py-2 rounded-md hover:bg-primary-600 transition-colors;
+  }
+
+  .card {
+    @apply bg-white rounded-lg shadow-md p-6 border border-neutral-200;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500;
   }
 }

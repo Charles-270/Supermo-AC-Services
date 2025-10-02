@@ -2,22 +2,33 @@
   "permissions": {
     "allow": [
       "Bash(gh:*)",
-      "Bash(refreshenv)",
-      "Bash(git init:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git remote add:*)",
-      "Bash(git branch:*)",
-      "Bash(git push:*)",
-      "Read(//c/Users/Ferbert Consult/**)",
-      "Bash(node:*)",
+      "Bash(git:*)",
       "Bash(npm:*)",
       "Bash(bun:*)",
+      "Bash(node:*)",
       "Bash(cd:*)",
-      "Bash(cat:*)"
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(pwd:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(rm:*)",
+      "Bash(echo:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(sleep:*)",
+      "Bash(firebase:*)",
+      "Read(//c/Users/Ferbert Consult/Claude Project/**)",
+      "Read(//c/Users/Ferbert Consult/supremo-ac-platform/**)",
+      "Bash(npx tailwindcss init:*)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [
+      "Bash(rm -rf:*)",
+      "Bash(rm -r:*)"
+    ]
   },
-  "outputStyle": "Explanatory"
+  "outputStyle": "Explanatory",
+  "customInstructions": "This is the Supremo AC Services platform - a Firebase-based HVAC service platform for Ghana. Always explain Firebase architecture decisions and optimize for Ghana's 3G/4G networks."
 }
