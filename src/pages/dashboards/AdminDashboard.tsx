@@ -4,13 +4,16 @@
  */
 
 import { useAuth } from '@/hooks/useAuth';
+import { useAdminStats } from '@/hooks/useAdminStats';
 import { AdminBookingsList } from '@/components/booking/AdminBookingsList';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Shield, Users, BarChart3, Settings, Activity } from 'lucide-react';
+import { Shield, Users, BarChart3, Settings, Loader2 } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 export function AdminDashboard() {
   const { profile, signOut } = useAuth();
+  const { totalUsers, activeBookings, totalRevenue, averageResponseTime, loading } = useAdminStats();
 
   return (
     <div className="min-h-screen bg-gradient-cool">
@@ -39,25 +42,49 @@ export function AdminDashboard() {
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Total Users</CardDescription>
-              <CardTitle className="text-3xl">1,234</CardTitle>
+              <CardTitle className="text-3xl">
+                {loading ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+                ) : (
+                  totalUsers
+                )}
+              </CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Active Bookings</CardDescription>
-              <CardTitle className="text-3xl">89</CardTitle>
+              <CardTitle className="text-3xl">
+                {loading ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+                ) : (
+                  activeBookings
+                )}
+              </CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-3">
-              <CardDescription>Revenue (Month)</CardDescription>
-              <CardTitle className="text-3xl">GH₵ 125K</CardTitle>
+              <CardDescription>Total Revenue</CardDescription>
+              <CardTitle className="text-3xl">
+                {loading ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+                ) : (
+                  formatCurrency(totalRevenue)
+                )}
+              </CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Avg. Response Time</CardDescription>
-              <CardTitle className="text-3xl">2.4h</CardTitle>
+              <CardTitle className="text-3xl">
+                {loading ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+                ) : (
+                  averageResponseTime
+                )}
+              </CardTitle>
             </CardHeader>
           </Card>
         </div>
