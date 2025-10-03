@@ -4,6 +4,7 @@
  */
 
 import { useAuth } from '@/hooks/useAuth';
+import { AdminBookingsList } from '@/components/booking/AdminBookingsList';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Shield, Users, BarChart3, Settings, Activity } from 'lucide-react';
@@ -113,39 +114,8 @@ export function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary-500" />
-              Recent Platform Activity
-            </CardTitle>
-            <CardDescription>Latest user actions and system events</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-4 p-3 border border-neutral-200 rounded-lg">
-                <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
-                  <Users className="h-5 w-5 text-primary-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">New user registered</p>
-                  <p className="text-xs text-neutral-600">Customer • 5 minutes ago</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 p-3 border border-neutral-200 rounded-lg">
-                <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center">
-                  <Activity className="h-5 w-5 text-success" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Service booking completed</p>
-                  <p className="text-xs text-neutral-600">Job #1234 • 1 hour ago</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Bookings Management */}
+        <AdminBookingsList />
       </main>
     </div>
   );

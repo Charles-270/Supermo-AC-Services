@@ -1,0 +1,153 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+
+    function isTechnician() {
+      return isAuthenticated() && getUserRole() == 'technician';
+    }
+
+    function isSupplier() {
+      return isAuthenticated() && getUserRole() == 'supplier';
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own profile
+      allow read: if isOwner(userId);
+
+      // Users can create their own profile during registration
+      allow create: if isOwner(userId) &&
+                      request.resource.data.uid == userId &&
+                      request.resource.data.email == request.auth.token.email;
+
+      // Users can update their own profile
+      allow update: if isOwner(userId);
+
+      // Admins can read/update all profiles
+      allow read, update: if isAdmin();
+    }
+
+    // Bookings collection
+    match /bookings/{bookingId} {
+      // Customers can read their own bookings
+      allow read: if isAuthenticated() &&
+                    resource.data.customerId == request.auth.uid;
+
+      // Customers can create bookings for themselves
+      allow create: if isAuthenticated() &&
+                      request.resource.data.customerId == request.auth.uid;
+
+      // Customers can update their own pending bookings (for cancellation)
+      allow update: if isAuthenticated() &&
+                      resource.data.customerId == request.auth.uid &&
+                      resource.data.status == 'pending';
+
+      // Technicians can read bookings assigned to them
+      allow read: if isAuthenticated() &&
+                    resource.data.technicianId == request.auth.uid;
+
+      // Technicians can update bookings assigned to them (status, notes, photos)
+      allow update: if isAuthenticated() &&
+                      resource.data.technicianId == request.auth.uid;
+
+      // Admins have full access to all bookings
+      allow read, write: if isAdmin();
+    }
+
+    // Products collection (for future e-commerce)
+    match /products/{productId} {
+      // Everyone can read products
+      allow read: if true;
+
+      // Only suppliers and admins can create/update products
+      allow create, update: if isSupplier() || isAdmin();
+
+      // Only admins can delete products
+      allow delete: if isAdmin();
+    }
+
+    // Orders collection (for future e-commerce)
+    match /orders/{orderId} {
+      // Customers can read their own orders
+      allow read: if isAuthenticated() &&
+                    resource.data.customerId == request.auth.uid;
+
+      // Customers can create orders for themselves
+      allow create: if isAuthenticated() &&
+                      request.resource.data.customerId == request.auth.uid;
+
+      // Suppliers can read orders for their products
+      allow read: if isSupplier();
+
+      // Admins have full access
+      allow read, write: if isAdmin();
+    }
+
+    // Courses collection (for training portal)
+    match /courses/{courseId} {
+      // Everyone can read courses
+      allow read: if true;
+
+      // Only admins can create/update/delete courses
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Enrollments collection (trainee course enrollments)
+    match /enrollments/{enrollmentId} {
+      // Trainees can read their own enrollments
+      allow read: if isAuthenticated() &&
+                    resource.data.traineeId == request.auth.uid;
+
+      // Trainees can create enrollments for themselves
+      allow create: if isAuthenticated() &&
+                      request.resource.data.traineeId == request.auth.uid;
+
+      // Trainees can update their progress
+      allow update: if isAuthenticated() &&
+                      resource.data.traineeId == request.auth.uid;
+
+      // Admins have full access
+      allow read, write: if isAdmin();
+    }
+
+    // Chat messages collection (for live support)
+    match /chats/{chatId}/messages/{messageId} {
+      // Users can read messages in their own chats
+      allow read: if isAuthenticated() &&
+                    get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid;
+
+      // Users can send messages in their own chats
+      allow create: if isAuthenticated() &&
+                      get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid;
+
+      // Admins and support staff can read all messages
+      allow read: if isAdmin();
+
+      // Admins can send messages in any chat
+      allow create: if isAdmin();
+    }
+
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
