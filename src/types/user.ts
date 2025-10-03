@@ -58,6 +58,7 @@ export interface UserProfile {
   isActive: boolean;
   isEmailVerified: boolean;
   isPhoneVerified?: boolean;
+  isApproved: boolean; // Admin approval required for sensitive roles (admin, technician)
 }
 
 /**
@@ -146,13 +147,20 @@ export const createDefaultUserProfile = (
   email: string,
   role: UserRole,
   displayName: string
-): Omit<UserProfile, 'createdAt' | 'updatedAt'> => ({
-  uid,
-  email,
-  role,
-  displayName,
-  metadata: {},
-  isActive: true,
-  isEmailVerified: false,
-  isPhoneVerified: false,
-});
+): Omit<UserProfile, 'createdAt' | 'updatedAt'> => {
+  // Auto-approve customers, suppliers, and trainees
+  // Require approval for admin and technician roles
+  const requiresApproval = role === 'admin' || role === 'technician';
+
+  return {
+    uid,
+    email,
+    role,
+    displayName,
+    metadata: {},
+    isActive: true,
+    isEmailVerified: false,
+    isPhoneVerified: false,
+    isApproved: !requiresApproval, // Auto-approve if doesn't require manual approval
+  };
+};

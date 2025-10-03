@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/hooks/useAuth';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { LandingPage } from '@/pages/LandingPage';
+import { PendingApproval } from '@/pages/PendingApproval';
 import { CustomerDashboard } from '@/pages/dashboards/CustomerDashboard';
 import { TechnicianDashboard } from '@/pages/dashboards/TechnicianDashboard';
 import { SupplierDashboard } from '@/pages/dashboards/SupplierDashboard';
@@ -21,6 +22,16 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LandingPage />} />
+
+          {/* Pending Approval Route */}
+          <Route
+            path="/pending-approval"
+            element={
+              <ProtectedRoute>
+                <PendingApproval />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Protected Dashboard Routes */}
           <Route

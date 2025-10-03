@@ -4,10 +4,14 @@
  */
 
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   updateDoc,
+  query,
+  where,
   serverTimestamp,
 } from 'firebase/firestore';
 import type { Timestamp } from 'firebase/firestore';
@@ -236,5 +240,50 @@ export async function markPhoneVerified(uid: string): Promise<void> {
   } catch (error) {
     console.error('Error marking phone as verified:', error);
     throw new Error('Failed to mark phone as verified');
+  }
+}
+
+/**
+ * Approve user account (Admin only)
+ */
+export async function approveUser(uid: string): Promise<void> {
+  try {
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      isApproved: true,
+      updatedAt: serverTimestamp(),
+    });
+    console.log('✅ User approved:', uid);
+  } catch (error) {
+    console.error('Error approving user:', error);
+    throw new Error('Failed to approve user');
+  }
+}
+
+/**
+ * Get all pending approval users (Admin only)
+ */
+export async function getPendingApprovalUsers(): Promise<any[]> {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(
+      usersRef,
+      where('isApproved', '==', false)
+    );
+
+    const querySnapshot = await getDocs(q);
+    const users: any[] = [];
+
+    querySnapshot.forEach((doc) => {
+      users.push({
+        uid: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    return users;
+  } catch (error) {
+    console.error('Error getting pending approval users:', error);
+    throw new Error('Failed to fetch pending approval users');
   }
 }

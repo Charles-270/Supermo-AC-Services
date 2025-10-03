@@ -17,7 +17,11 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && getUserRole() == 'admin';
+      return isAuthenticated() && getUserRole() == 'admin' && isApproved();
+    }
+
+    function isApproved() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true;
     }
 
     function isTechnician() {
