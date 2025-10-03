@@ -56,10 +56,16 @@ export async function createUserProfile(
     // Create default profile
     const defaultProfile = createDefaultUserProfile(uid, email, role, displayName);
 
-    // Merge with additional data
+    // Merge with additional data, filtering out undefined values
+    const cleanedAdditionalData = additionalData
+      ? Object.fromEntries(
+          Object.entries(additionalData).filter(([_, v]) => v !== undefined)
+        )
+      : {};
+
     const userProfile: UserProfile = {
       ...defaultProfile,
-      ...additionalData,
+      ...cleanedAdditionalData,
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
     };
