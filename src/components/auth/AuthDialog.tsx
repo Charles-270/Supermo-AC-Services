@@ -35,7 +35,7 @@ interface AuthDialogProps {
 }
 
 export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDialogProps) {
-  const { signIn, signUp, signInWithGoogle } = useAuth();
+  const { signIn, signUp, signInWithGoogle, refreshProfile } = useAuth();
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +62,10 @@ export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDia
 
     try {
       await signIn(loginEmail, loginPassword);
+
+      // Wait a moment for profile to load
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       onOpenChange(false);
     } catch (err) {
       setError((err as Error).message || 'Failed to sign in');
@@ -99,6 +103,9 @@ export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDia
       await createUserProfile(user.uid, registerEmail, role, displayName, {
         phoneNumber: phoneNumber || undefined,
       });
+
+      // Refresh profile to trigger redirect
+      await refreshProfile();
 
       onOpenChange(false);
     } catch (err) {
