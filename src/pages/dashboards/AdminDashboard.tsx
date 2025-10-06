@@ -6,14 +6,18 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminStats } from '@/hooks/useAdminStats';
 import { AdminBookingsList } from '@/components/booking/AdminBookingsList';
+import { SupplierManagement } from '@/components/admin/SupplierManagement';
+import { AdminApprovals } from '@/components/admin/AdminApprovals';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Shield, Users, BarChart3, Settings, Loader2 } from 'lucide-react';
+import { Shield, Users, BarChart3, Settings, Loader2, Package, Edit, ShoppingBag } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 export function AdminDashboard() {
   const { profile, signOut } = useAuth();
   const { totalUsers, activeBookings, totalRevenue, averageResponseTime, loading } = useAdminStats();
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-gradient-cool">
@@ -89,9 +93,14 @@ export function AdminDashboard() {
           </Card>
         </div>
 
+        {/* Admin Approval Requests - Priority Section */}
+        <div className="mb-8">
+          <AdminApprovals />
+        </div>
+
         {/* Management Sections */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary-500" />
@@ -102,11 +111,13 @@ export function AdminDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full">Manage Users</Button>
+              <Button className="w-full" onClick={() => navigate('/admin/manage-users')}>
+                Manage Users
+              </Button>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-accent-500" />
@@ -117,13 +128,13 @@ export function AdminDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="secondary" className="w-full">
+              <Button variant="secondary" className="w-full" onClick={() => navigate('/admin/analytics')}>
                 View Analytics
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5 text-neutral-600" />
@@ -134,11 +145,71 @@ export function AdminDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" onClick={() => navigate('/admin/settings')}>
                 Settings
               </Button>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Product & Order Management Tools */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary-500" />
+              E-Commerce Management
+            </CardTitle>
+            <CardDescription>
+              Manage products, orders, images, and inventory
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Button
+                onClick={() => navigate('/admin/manage-products')}
+                variant="default"
+                size="lg"
+                className="h-auto py-6 flex flex-col items-center gap-2"
+              >
+                <Edit className="h-8 w-8" />
+                <div className="text-center">
+                  <div className="font-semibold text-lg">Manage Products</div>
+                  <div className="text-sm opacity-90">Add, edit, delete products & images</div>
+                </div>
+              </Button>
+
+              <Button
+                onClick={() => navigate('/admin/manage-orders')}
+                variant="default"
+                size="lg"
+                className="h-auto py-6 flex flex-col items-center gap-2 bg-accent-500 hover:bg-accent-600"
+              >
+                <ShoppingBag className="h-8 w-8" />
+                <div className="text-center">
+                  <div className="font-semibold text-lg">Manage Orders</div>
+                  <div className="text-sm opacity-90">View & update customer orders</div>
+                </div>
+              </Button>
+
+              <Button
+                onClick={() => navigate('/products')}
+                variant="outline"
+                size="lg"
+                className="h-auto py-6 flex flex-col items-center gap-2"
+              >
+                <Package className="h-8 w-8 text-primary-500" />
+                <div className="text-center">
+                  <div className="font-semibold text-lg">View Catalog</div>
+                  <div className="text-sm text-neutral-500">Browse all products</div>
+                </div>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Supplier Management */}
+        <div className="mb-8">
+          <SupplierManagement />
         </div>
 
         {/* Bookings Management */}

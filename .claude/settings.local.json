@@ -21,7 +21,14 @@
       "Bash(firebase:*)",
       "Read(//c/Users/Ferbert Consult/Claude Project/**)",
       "Read(//c/Users/Ferbert Consult/supremo-ac-platform/**)",
-      "Bash(npx tailwindcss init:*)"
+      "Bash(npx tailwindcss init:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(PORT=5174 npm run dev)",
+      "WebSearch",
+      "Bash(npx vite build:*)",
+      "Bash(npx vite:*)",
+      "Bash(npx tsc:*)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": [

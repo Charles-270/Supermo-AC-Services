@@ -30,7 +30,7 @@ export async function createBooking(
   userEmail: string
 ): Promise<string> {
   try {
-    const bookingData: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> = {
+    const bookingData: any = {
       customerId: userId,
       customerName: userName,
       customerEmail: userEmail,
@@ -41,7 +41,6 @@ export async function createBooking(
 
       preferredDate: formData.preferredDate as unknown as Timestamp,
       preferredTimeSlot: formData.preferredTimeSlot,
-      alternateDate: formData.alternateDate as unknown as Timestamp | undefined,
 
       address: formData.address,
       city: formData.city,
@@ -50,6 +49,11 @@ export async function createBooking(
       status: 'pending',
       priority: formData.serviceDetails.urgencyLevel || 'normal',
     };
+
+    // Only add alternateDate if it exists (Firestore doesn't allow undefined)
+    if (formData.alternateDate) {
+      bookingData.alternateDate = formData.alternateDate as unknown as Timestamp;
+    }
 
     const bookingsRef = collection(db, 'bookings');
     const docRef = await addDoc(bookingsRef, {

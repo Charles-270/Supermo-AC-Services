@@ -1,0 +1,71 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for Supremo AC Services
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return isAuthenticated() &&
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Helper function to validate image files
+    function isValidImage() {
+      return request.resource.size < 5 * 1024 * 1024 && // Max 5MB
+             (request.resource.contentType == 'image/jpeg' ||
+              request.resource.contentType == 'image/jpg' ||
+              request.resource.contentType == 'image/png' ||
+              request.resource.contentType == 'image/webp' ||
+              request.resource.contentType == 'image/avif');
+    }
+
+    // Product images - Admin can upload, everyone can read
+    match /products/{productFolder}/{imageName} {
+      // Anyone can read product images (public access)
+      allow read: if true;
+
+      // Only admins can upload product images
+      allow write: if isAdmin() && isValidImage();
+
+      // Only admins can delete product images
+      allow delete: if isAdmin();
+    }
+
+    // User profile pictures - Users can upload their own
+    match /users/{userId}/profile/{imageName} {
+      // User can read their own profile picture, admins can read all
+      allow read: if isAuthenticated();
+
+      // User can upload/update their own profile picture
+      allow write: if isAuthenticated() &&
+                     request.auth.uid == userId &&
+                     isValidImage();
+
+      // User can delete their own profile picture
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Service request attachments
+    match /service-requests/{requestId}/{imageName} {
+      // Only authenticated users can read
+      allow read: if isAuthenticated();
+
+      // Only the request owner or admin can upload
+      allow write: if isAuthenticated() && isValidImage();
+
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+
+    // Default deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

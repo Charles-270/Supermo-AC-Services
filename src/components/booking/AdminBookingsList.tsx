@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { getAllBookings, updateBookingStatus, assignTechnician } from '@/services/bookingService';
+import { TechnicianSelector } from '@/components/admin/TechnicianSelector';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,7 +40,8 @@ export function AdminBookingsList() {
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [technicianName, setTechnicianName] = useState('');
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState('');
+  const [selectedTechnicianName, setSelectedTechnicianName] = useState('');
   const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
@@ -68,15 +70,14 @@ export function AdminBookingsList() {
   };
 
   const handleAssignTechnician = async () => {
-    if (!selectedBooking || !technicianName.trim()) return;
+    if (!selectedBooking || !selectedTechnicianId) return;
 
     try {
       setAssigning(true);
-      // In a real app, you'd select from a list of technicians
-      // For now, we'll use the entered name
-      await assignTechnician(selectedBooking.id, 'tech-id-placeholder', technicianName);
+      await assignTechnician(selectedBooking.id, selectedTechnicianId, selectedTechnicianName);
       setAssignDialogOpen(false);
-      setTechnicianName('');
+      setSelectedTechnicianId('');
+      setSelectedTechnicianName('');
       setSelectedBooking(null);
       await loadBookings();
     } catch (error) {
@@ -231,31 +232,30 @@ export function AdminBookingsList() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="technician-name">Technician Name</Label>
-              <Input
-                id="technician-name"
-                placeholder="Enter technician name"
-                value={technicianName}
-                onChange={(e) => setTechnicianName(e.target.value)}
-              />
-              <p className="text-xs text-neutral-500">
-                In a full system, you'd select from a list of available technicians
-              </p>
-            </div>
+            <TechnicianSelector
+              onSelect={(id, name) => {
+                setSelectedTechnicianId(id);
+                setSelectedTechnicianName(name);
+              }}
+              selectedTechnicianId={selectedTechnicianId}
+              serviceArea={selectedBooking?.city || ''}
+              showOnlyAvailable={true}
+              showRecommendations={false}
+            />
 
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
                 onClick={() => {
                   setAssignDialogOpen(false);
-                  setTechnicianName('');
+                  setSelectedTechnicianId('');
+                  setSelectedTechnicianName('');
                   setSelectedBooking(null);
                 }}
               >
                 Cancel
               </Button>
-              <Button onClick={handleAssignTechnician} disabled={assigning || !technicianName.trim()}>
+              <Button onClick={handleAssignTechnician} disabled={assigning || !selectedTechnicianId}>
                 {assigning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Assign
               </Button>

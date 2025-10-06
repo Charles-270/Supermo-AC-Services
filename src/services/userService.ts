@@ -287,3 +287,130 @@ export async function getPendingApprovalUsers(): Promise<any[]> {
     throw new Error('Failed to fetch pending approval users');
   }
 }
+
+/**
+ * Get pending admin approval users (Admin only)
+ * Specifically for approving admin role requests
+ */
+export async function getPendingAdminApprovals(): Promise<UserProfile[]> {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(
+      usersRef,
+      where('isApproved', '==', false),
+      where('role', '==', 'admin')
+    );
+
+    const querySnapshot = await getDocs(q);
+    const users: UserProfile[] = [];
+
+    querySnapshot.forEach((doc) => {
+      users.push({
+        uid: doc.id,
+        ...doc.data(),
+      } as UserProfile);
+    });
+
+    return users;
+  } catch (error) {
+    console.error('Error getting pending admin approvals:', error);
+    throw new Error('Failed to fetch pending admin approvals');
+  }
+}
+
+/**
+ * Get all users (Admin only)
+ */
+export async function getAllUsers(): Promise<UserProfile[]> {
+  try {
+    const usersRef = collection(db, 'users');
+    const querySnapshot = await getDocs(usersRef);
+    const users: UserProfile[] = [];
+
+    querySnapshot.forEach((doc) => {
+      users.push({
+        uid: doc.id,
+        ...doc.data(),
+      } as UserProfile);
+    });
+
+    return users;
+  } catch (error) {
+    console.error('Error getting all users:', error);
+    throw new Error('Failed to fetch all users');
+  }
+}
+
+/**
+ * Get users by role (Admin only)
+ */
+export async function getUsersByRole(role: UserRole): Promise<UserProfile[]> {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('role', '==', role));
+
+    const querySnapshot = await getDocs(q);
+    const users: UserProfile[] = [];
+
+    querySnapshot.forEach((doc) => {
+      users.push({
+        uid: doc.id,
+        ...doc.data(),
+      } as UserProfile);
+    });
+
+    return users;
+  } catch (error) {
+    console.error('Error getting users by role:', error);
+    throw new Error('Failed to fetch users by role');
+  }
+}
+
+/**
+ * Search users by name or email (Admin only)
+ */
+export async function searchUsers(searchTerm: string): Promise<UserProfile[]> {
+  try {
+    const usersRef = collection(db, 'users');
+    const querySnapshot = await getDocs(usersRef);
+    const users: UserProfile[] = [];
+
+    querySnapshot.forEach((doc) => {
+      const userData = doc.data() as UserProfile;
+      const matchesName = userData.displayName?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesEmail = userData.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      if (matchesName || matchesEmail) {
+        users.push({
+          uid: doc.id,
+          ...userData,
+        });
+      }
+    });
+
+    return users;
+  } catch (error) {
+    console.error('Error searching users:', error);
+    throw new Error('Failed to search users');
+  }
+}
+
+/**
+ * Delete user account (Admin only - WARNING: Permanent)
+ */
+export async function deleteUserProfile(uid: string): Promise<void> {
+  try {
+    // Note: This only deletes the Firestore profile
+    // Firebase Authentication user must be deleted separately via Admin SDK
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      isActive: false,
+      isApproved: false,
+      updatedAt: serverTimestamp(),
+    });
+    console.log('✅ User profile deleted (soft delete):', uid);
+  } catch (error) {
+    console.error('Error deleting user profile:', error);
+    throw new Error('Failed to delete user profile');
+  }
+}

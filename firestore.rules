@@ -12,24 +12,34 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Use custom claims for roles (faster, no Firestore lookup, no race conditions)
     function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return request.auth.token.role;
     }
 
     function isAdmin() {
-      return isAuthenticated() && getUserRole() == 'admin' && isApproved();
-    }
-
-    function isApproved() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true;
+      return isAuthenticated() &&
+             request.auth.token.role == 'admin' &&
+             request.auth.token.isApproved == true;
     }
 
     function isTechnician() {
-      return isAuthenticated() && getUserRole() == 'technician';
+      return isAuthenticated() && request.auth.token.role == 'technician';
     }
 
     function isSupplier() {
-      return isAuthenticated() && getUserRole() == 'supplier';
+      return isAuthenticated() && request.auth.token.role == 'supplier';
+    }
+
+    // Fallback: Check user role from Firestore (for cases without custom claims)
+    function getUserRoleFromDb() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdminDb() {
+      return isAuthenticated() &&
+             getUserRoleFromDb() == 'admin' &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true;
     }
 
     // Users collection
@@ -45,8 +55,8 @@ service cloud.firestore {
       // Users can update their own profile
       allow update: if isOwner(userId);
 
-      // Admins can read/update all profiles
-      allow read, update: if isAdmin();
+      // Admins can read/update all profiles (try custom claims first, fallback to DB)
+      allow read, update: if isAdmin() || isAdminDb();
     }
 
     // Bookings collection
@@ -72,8 +82,8 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
                       resource.data.technicianId == request.auth.uid;
 
-      // Admins have full access to all bookings
-      allow read, write: if isAdmin();
+      // Admins have full access to all bookings (try custom claims first, fallback to DB)
+      allow read, write: if isAdmin() || isAdminDb();
     }
 
     // Products collection (for future e-commerce)
@@ -81,28 +91,36 @@ service cloud.firestore {
       // Everyone can read products
       allow read: if true;
 
-      // Only suppliers and admins can create/update products
-      allow create, update: if isSupplier() || isAdmin();
+      // Only suppliers and admins can create products
+      allow create: if isSupplier() || isAdmin() || isAdminDb();
+
+      // Suppliers, admins, and authenticated users (for stock updates during orders) can update
+      // Stock updates are allowed for authenticated users during checkout
+      allow update: if isSupplier() || isAdmin() || isAdminDb() || isAuthenticated();
 
       // Only admins can delete products
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isAdminDb();
     }
 
-    // Orders collection (for future e-commerce)
+    // Orders collection (for e-commerce)
     match /orders/{orderId} {
-      // Customers can read their own orders
+      // Customers can read their own orders (no DB lookup - instant!)
       allow read: if isAuthenticated() &&
                     resource.data.customerId == request.auth.uid;
 
-      // Customers can create orders for themselves
+      // Customers can create orders for themselves (no DB lookup - instant!)
       allow create: if isAuthenticated() &&
                       request.resource.data.customerId == request.auth.uid;
+
+      // Customers can update their own orders for cancellation (no DB lookup - instant!)
+      allow update: if isAuthenticated() &&
+                      resource.data.customerId == request.auth.uid;
 
       // Suppliers can read orders for their products
       allow read: if isSupplier();
 
-      // Admins have full access
-      allow read, write: if isAdmin();
+      // Admins have full access (try custom claims first for speed, fallback to DB)
+      allow read, write: if isAdmin() || isAdminDb();
     }
 
     // Courses collection (for training portal)
@@ -111,7 +129,7 @@ service cloud.firestore {
       allow read: if true;
 
       // Only admins can create/update/delete courses
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if isAdmin() || isAdminDb();
     }
 
     // Enrollments collection (trainee course enrollments)
@@ -129,7 +147,47 @@ service cloud.firestore {
                       resource.data.traineeId == request.auth.uid;
 
       // Admins have full access
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() || isAdminDb();
+    }
+
+    // Reviews collection (for product reviews)
+    match /reviews/{reviewId} {
+      // Everyone can read reviews
+      allow read: if true;
+
+      // Customers can create reviews for their own orders
+      allow create: if isAuthenticated() &&
+                      request.resource.data.customerId == request.auth.uid;
+
+      // Customers can update their own reviews
+      allow update: if isAuthenticated() &&
+                      resource.data.customerId == request.auth.uid;
+
+      // Admins can manage all reviews
+      allow read, write: if isAdmin() || isAdminDb();
+    }
+
+    // Returns collection (for return/refund requests)
+    match /returns/{returnId} {
+      // Customers can read their own return requests
+      allow read: if isAuthenticated() &&
+                    resource.data.customerId == request.auth.uid;
+
+      // Customers can create return requests for their own orders
+      allow create: if isAuthenticated() &&
+                      request.resource.data.customerId == request.auth.uid;
+
+      // Admins can manage all return requests
+      allow read, write: if isAdmin() || isAdminDb();
+    }
+
+    // Settings collection (platform configuration)
+    match /settings/{settingId} {
+      // Anyone can read settings (needed for public-facing features like business hours)
+      allow read: if true;
+
+      // Only admins can update settings (try custom claims first for speed, fallback to DB)
+      allow write: if isAdmin() || isAdminDb();
     }
 
     // Chat messages collection (for live support)
@@ -143,11 +201,28 @@ service cloud.firestore {
                       get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid;
 
       // Admins and support staff can read all messages
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isAdminDb();
 
       // Admins can send messages in any chat
-      allow create: if isAdmin();
+      allow create: if isAdmin() || isAdminDb();
     }
+
+    // Products collection (for e-commerce) - duplicate removed, already handled above
+    // match /products/{productId} {
+    //   allow read: if true;
+    //   allow create: if isSupplier() || isAdmin();
+    //   allow update: if isSupplier() || isAdmin() || isAuthenticated();
+    //   allow delete: if isAdmin();
+    // }
+
+    // Orders collection (for e-commerce) - duplicate removed, already handled above
+    // match /orders/{orderId} {
+    //   allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid;
+    //   allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+    //   allow update: if isAuthenticated() && resource.data.customerId == request.auth.uid;
+    //   allow read: if isSupplier();
+    //   allow read, write: if isAdmin();
+    // }
 
     // Default deny all other collections
     match /{document=**} {

@@ -4,6 +4,7 @@
  */
 
 import { Timestamp } from 'firebase/firestore';
+import type { TechnicianMetadata } from './technician';
 
 /**
  * User Roles

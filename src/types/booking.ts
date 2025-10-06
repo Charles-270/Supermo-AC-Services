@@ -21,6 +21,8 @@ export type ACUnitType = 'split' | 'window' | 'central' | 'portable' | 'other';
 export type BookingStatus =
   | 'pending'           // Awaiting admin assignment
   | 'confirmed'         // Assigned to technician
+  | 'en_route'          // Technician traveling to location
+  | 'arrived'           // Technician on-site
   | 'in_progress'       // Technician working
   | 'completed'         // Job finished
   | 'cancelled'         // Cancelled by customer/admin
@@ -94,6 +96,13 @@ export interface Booking {
   actualEndTime?: Timestamp;
   finalCost?: number;
   serviceNotes?: string;
+  laborHours?: number;
+  partsUsed?: Array<{
+    name: string;
+    quantity: number;
+    cost: number;
+  }>;
+  customerSignature?: string; // Base64 data URL
   customerRating?: number; // 1-5 stars
   customerReview?: string;
 
@@ -173,6 +182,8 @@ export const TIME_SLOT_LABELS = {
 export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
   pending: 'Pending Assignment',
   confirmed: 'Confirmed',
+  en_route: 'En Route',
+  arrived: 'Arrived On-Site',
   in_progress: 'In Progress',
   completed: 'Completed',
   cancelled: 'Cancelled',
@@ -185,6 +196,8 @@ export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
 export const BOOKING_STATUS_VARIANTS: Record<BookingStatus, 'default' | 'success' | 'warning' | 'destructive'> = {
   pending: 'warning',
   confirmed: 'default',
+  en_route: 'default',
+  arrived: 'default',
   in_progress: 'default',
   completed: 'success',
   cancelled: 'destructive',

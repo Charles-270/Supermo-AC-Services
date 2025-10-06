@@ -35,10 +35,11 @@ interface AuthDialogProps {
 }
 
 export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDialogProps) {
-  const { signIn, signUp, signInWithGoogle, refreshProfile } = useAuth();
+  const { signIn, signUp, signInWithGoogle, refreshProfile, resetPassword } = useAuth();
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -134,6 +135,29 @@ export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDia
     }
   };
 
+  /**
+   * Handle Forgot Password
+   */
+  const handleForgotPassword = async () => {
+    if (!loginEmail) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      await resetPassword(loginEmail);
+      setResetEmailSent(true);
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message || 'Failed to send reset email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
@@ -167,7 +191,17 @@ export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDia
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="login-password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="login-password">Password</Label>
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-xs text-primary-600 hover:underline"
+                    disabled={loading}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 <Input
                   id="login-password"
                   type="password"
@@ -178,6 +212,12 @@ export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDia
                   disabled={loading}
                 />
               </div>
+
+              {resetEmailSent && (
+                <div className="text-sm text-success-600 bg-green-50 p-3 rounded-md">
+                  Password reset email sent! Check your inbox.
+                </div>
+              )}
 
               {error && (
                 <div className="text-sm text-error bg-red-50 p-3 rounded-md">
