@@ -3,6 +3,8 @@
  * Ghana's leading payment gateway
  */
 
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '@/lib/firebase';
 import type { PaymentMethod } from '@/types/product';
 
 // Paystack public key (use environment variable in production)
@@ -110,16 +112,13 @@ export function getPaystackChannels(paymentMethod: PaymentMethod): string[] {
 }
 
 /**
- * Verify payment (to be called on backend via Cloud Function)
- * This is a frontend helper to trigger verification
+ * Verify payment via Cloud Function
  */
-export async function verifyPayment(reference: string): Promise<boolean> {
+export async function verifyPayment(orderId: string, reference: string): Promise<boolean> {
   try {
-    // In production, this should call your Cloud Function
-    // which will verify with Paystack's API using the secret key
-    const response = await fetch(`/api/verify-payment?reference=${reference}`);
-    const data = await response.json();
-    return data.status === 'success';
+    const verifyPaystackPayment = httpsCallable(functions, 'verifyPaystackPayment');
+    const result = await verifyPaystackPayment({ orderId, reference });
+    return Boolean((result.data as { success?: boolean })?.success);
   } catch (error) {
     console.error('Error verifying payment:', error);
     return false;

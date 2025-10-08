@@ -42,6 +42,7 @@ import {
   setMaintenanceMode,
 } from '@/services/settingsService';
 import type { PlatformSettings, ServiceType } from '@/types/settings';
+import { toast } from '@/components/ui/use-toast';
 
 export default function PlatformSettings() {
   const { profile } = useAuth();
@@ -73,7 +74,11 @@ export default function PlatformSettings() {
       setSystemForm(data.system);
     } catch (error) {
       console.error('Error loading settings:', error);
-      alert('Failed to load settings. Please try again.');
+      toast({
+        title: 'Failed to load settings',
+        description: 'Please try again or refresh the page.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -84,11 +89,19 @@ export default function PlatformSettings() {
     setSaving(true);
     try {
       await updateGeneralSettings(generalForm, profile.uid);
-      alert('✅ General settings saved successfully!');
+      toast({
+        title: 'General settings updated',
+        description: 'Your changes have been saved successfully.',
+        variant: 'success',
+      });
       await loadSettings();
     } catch (error) {
       console.error('Error saving general settings:', error);
-      alert('❌ Failed to save settings. Please try again.');
+      toast({
+        title: 'Failed to save general settings',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
@@ -99,11 +112,19 @@ export default function PlatformSettings() {
     setSaving(true);
     try {
       await updateServiceSettings(serviceForm, profile.uid);
-      alert('✅ Service settings saved successfully!');
+      toast({
+        title: 'Service settings updated',
+        description: 'Service configuration has been saved.',
+        variant: 'success',
+      });
       await loadSettings();
     } catch (error) {
       console.error('Error saving service settings:', error);
-      alert('❌ Failed to save settings. Please try again.');
+      toast({
+        title: 'Failed to save service settings',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
@@ -114,11 +135,19 @@ export default function PlatformSettings() {
     setSaving(true);
     try {
       await updatePaymentSettings(paymentForm, profile.uid);
-      alert('✅ Payment settings saved successfully!');
+      toast({
+        title: 'Payment settings updated',
+        description: 'Payment configuration has been saved.',
+        variant: 'success',
+      });
       await loadSettings();
     } catch (error) {
       console.error('Error saving payment settings:', error);
-      alert('❌ Failed to save settings. Please try again.');
+      toast({
+        title: 'Failed to save payment settings',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
@@ -129,11 +158,19 @@ export default function PlatformSettings() {
     setSaving(true);
     try {
       await updateNotificationSettings(notificationForm, profile.uid);
-      alert('✅ Notification settings saved successfully!');
+      toast({
+        title: 'Notification settings updated',
+        description: 'Notification preferences have been saved.',
+        variant: 'success',
+      });
       await loadSettings();
     } catch (error) {
       console.error('Error saving notification settings:', error);
-      alert('❌ Failed to save settings. Please try again.');
+      toast({
+        title: 'Failed to save notification settings',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
@@ -144,11 +181,19 @@ export default function PlatformSettings() {
     setSaving(true);
     try {
       await updateSystemSettings(systemForm, profile.uid);
-      alert('✅ System settings saved successfully!');
+      toast({
+        title: 'System settings updated',
+        description: 'System configuration has been saved.',
+        variant: 'success',
+      });
       await loadSettings();
     } catch (error) {
       console.error('Error saving system settings:', error);
-      alert('❌ Failed to save settings. Please try again.');
+      toast({
+        title: 'Failed to save system settings',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
@@ -160,11 +205,21 @@ export default function PlatformSettings() {
     try {
       const newValue = !systemForm.maintenanceMode;
       await setMaintenanceMode(newValue, systemForm.maintenanceMessage, profile.uid);
-      alert(newValue ? '🔧 Maintenance mode enabled' : '✅ Maintenance mode disabled');
+      toast({
+        title: newValue ? 'Maintenance mode enabled' : 'Maintenance mode disabled',
+        description: newValue
+          ? 'Users will see a maintenance notice across the platform.'
+          : 'The platform is back online for users.',
+        variant: 'success',
+      });
       await loadSettings();
     } catch (error) {
       console.error('Error toggling maintenance mode:', error);
-      alert('❌ Failed to toggle maintenance mode.');
+      toast({
+        title: 'Failed to toggle maintenance mode',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }

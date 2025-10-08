@@ -12,6 +12,7 @@ import { Upload, CheckCircle2, XCircle, ImageIcon, Loader2 } from 'lucide-react'
 import { uploadProductImage, type UploadResult } from '@/utils/imageUpload';
 import { updateDoc, doc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { toast } from '@/components/ui/use-toast';
 
 // List of 26 products in order
 const PRODUCT_LIST = [
@@ -78,7 +79,11 @@ export default function UploadImages() {
     const filesToUpload = uploads.filter((u) => u.file !== null);
 
     if (filesToUpload.length === 0) {
-      alert('Please select at least one image to upload');
+      toast({
+        title: 'No files selected',
+        description: 'Please choose at least one image to upload.',
+        variant: 'destructive',
+      });
       return;
     }
 

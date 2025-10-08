@@ -126,6 +126,9 @@ export interface Order {
   paymentStatus: PaymentStatus;
   paymentReference?: string; // Paystack reference
   paystackAuthUrl?: string;
+  paymentGateway?: string;
+  paidAt?: Timestamp;
+  transactions?: PaymentTransaction[];
 
   orderStatus: OrderStatus;
   trackingNumber?: string;
@@ -138,6 +141,17 @@ export interface Order {
   updatedAt: Timestamp;
   cancelledAt?: Timestamp;
   cancellationReason?: string;
+}
+
+export interface PaymentTransaction {
+  gateway: string;
+  reference: string;
+  status?: string;
+  channel?: string;
+  currency?: string;
+  amount?: number;
+  paidAt?: string;
+  createdAt?: string;
 }
 
 // Filter options for product catalog

@@ -3,6 +3,7 @@
  */
 
 import type { Order } from '@/types/product';
+import { toast } from '@/components/ui/use-toast';
 
 /**
  * Format date for invoice
@@ -551,7 +552,11 @@ export function printInvoice(order: Order) {
     printWindow.document.write(invoiceHTML);
     printWindow.document.close();
   } else {
-    alert('Please allow popups to print the invoice');
+    toast({
+      title: 'Popup blocked',
+      description: 'Please allow popups to print the invoice.',
+      variant: 'destructive',
+    });
   }
 }
 
@@ -566,6 +571,10 @@ export function printPackingSlip(order: Order) {
     printWindow.document.write(packingSlipHTML);
     printWindow.document.close();
   } else {
-    alert('Please allow popups to print the packing slip');
+    toast({
+      title: 'Popup blocked',
+      description: 'Please allow popups to print the packing slip.',
+      variant: 'destructive',
+    });
   }
 }

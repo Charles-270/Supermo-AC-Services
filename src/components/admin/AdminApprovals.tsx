@@ -34,6 +34,7 @@ import {
   deactivateUser,
 } from '@/services/userService';
 import type { UserProfile } from '@/types/user';
+import { toast } from '@/components/ui/use-toast';
 
 export function AdminApprovals() {
   const [pendingAdmins, setPendingAdmins] = useState<UserProfile[]>([]);
@@ -81,9 +82,21 @@ export function AdminApprovals() {
       await fetchPendingAdmins();
       setActionDialogOpen(false);
       setSelectedApplicant(null);
+      toast({
+        title: actionType === 'approve' ? 'Admin access granted' : 'Request rejected',
+        description:
+          actionType === 'approve'
+            ? `${selectedApplicant.displayName} now has admin privileges.`
+            : `${selectedApplicant.displayName}'s admin request has been rejected.`,
+        variant: actionType === 'approve' ? 'success' : 'default',
+      });
     } catch (error) {
       console.error('Error performing action:', error);
-      alert('Failed to perform action. Please try again.');
+      toast({
+        title: 'Action failed',
+        description: 'Failed to perform action. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setProcessing(false);
     }

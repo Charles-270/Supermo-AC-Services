@@ -91,13 +91,15 @@ export function TechnicianSelector({
     }
   };
 
-  const filteredTechnicians = technicians.filter(tech => {
+  const filteredTechnicians = technicians.filter((tech) => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
+    const metadata = (tech.metadata || {}) as Partial<TechnicianMetadata>;
+    const level = metadata.level ? metadata.level.toLowerCase() : '';
     return (
-      tech.displayName.toLowerCase().includes(searchLower) ||
-      tech.email.toLowerCase().includes(searchLower) ||
-      (tech.metadata as TechnicianMetadata).level.toLowerCase().includes(searchLower)
+      (tech.displayName || '').toLowerCase().includes(searchLower) ||
+      (tech.email || '').toLowerCase().includes(searchLower) ||
+      level.includes(searchLower)
     );
   });
 
@@ -150,10 +152,11 @@ export function TechnicianSelector({
                 </div>
               ) : (
                 filteredTechnicians.map((tech) => {
-                  const metadata = tech.metadata as TechnicianMetadata;
-                  const currentJobs = metadata.currentJobIds?.length || 0;
-                  const maxJobs = metadata.maxJobsPerDay || 8;
-                  const isAvailable = metadata.availabilityStatus === 'available';
+                  const metadata = (tech.metadata || {}) as Partial<TechnicianMetadata>;
+                  const level = metadata.level ?? 'technician';
+                  const currentJobs = Array.isArray(metadata.currentJobIds) ? metadata.currentJobIds.length : 0;
+                  const maxJobs = metadata.maxJobsPerDay ?? 8;
+                  const isAvailable = (metadata.availabilityStatus ?? 'available') === 'available';
 
                   return (
                     <SelectItem key={tech.uid} value={tech.uid}>
@@ -163,7 +166,7 @@ export function TechnicianSelector({
                           <div>
                             <div className="font-medium">{tech.displayName}</div>
                             <div className="text-xs text-neutral-500">
-                              {TECHNICIAN_LEVEL_LABELS[metadata.level]} • {currentJobs}/{maxJobs} jobs
+                              {TECHNICIAN_LEVEL_LABELS[level]} • {currentJobs}/{maxJobs} jobs
                             </div>
                           </div>
                         </div>
@@ -253,7 +256,15 @@ export function TechnicianSelector({
  * Technician Card - Shows details of selected technician
  */
 function TechnicianCard({ technician }: { technician: TechnicianProfile }) {
-  const metadata = technician.metadata as TechnicianMetadata;
+  const metadata = (technician.metadata || {}) as Partial<TechnicianMetadata>;
+  const level = metadata.level ?? 'technician';
+  const experienceYears = metadata.yearsOfExperience ?? 0;
+  const currentJobs = Array.isArray(metadata.currentJobIds) ? metadata.currentJobIds.length : 0;
+  const maxJobs = metadata.maxJobsPerDay ?? 8;
+  const rating = metadata.averageRating;
+  const ratingDisplay =
+    typeof rating === 'number' ? `${rating.toFixed(1)}⭐` : 'N/A';
+  const skills = metadata.skills || [];
 
   return (
     <div className="border border-neutral-200 rounded-lg p-4 bg-neutral-50">
@@ -262,44 +273,44 @@ function TechnicianCard({ technician }: { technician: TechnicianProfile }) {
           <h4 className="font-semibold text-neutral-900">{technician.displayName}</h4>
           <p className="text-sm text-neutral-600">{technician.email}</p>
         </div>
-        <Badge className={TECHNICIAN_LEVEL_COLORS[metadata.level]}>
-          {TECHNICIAN_LEVEL_LABELS[metadata.level]}
+        <Badge className={TECHNICIAN_LEVEL_COLORS[level]}>
+          {TECHNICIAN_LEVEL_LABELS[level]}
         </Badge>
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
           <span className="text-neutral-600">Experience:</span>
-          <span className="ml-1 font-medium">{metadata.yearsOfExperience} years</span>
+          <span className="ml-1 font-medium">{experienceYears} years</span>
         </div>
         <div>
           <span className="text-neutral-600">Current Jobs:</span>
           <span className="ml-1 font-medium">
-            {metadata.currentJobIds?.length || 0}/{metadata.maxJobsPerDay || 8}
+            {currentJobs}/{maxJobs}
           </span>
         </div>
         <div>
           <span className="text-neutral-600">Rating:</span>
-          <span className="ml-1 font-medium">{metadata.averageRating?.toFixed(1) || 'N/A'}⭐</span>
+          <span className="ml-1 font-medium">{ratingDisplay}</span>
         </div>
         <div>
           <span className="text-neutral-600">Completed:</span>
-          <span className="ml-1 font-medium">{metadata.totalJobsCompleted || 0} jobs</span>
+          <span className="ml-1 font-medium">{metadata.totalJobsCompleted ?? 0} jobs</span>
         </div>
       </div>
 
-      {metadata.skills && metadata.skills.length > 0 && (
+      {skills.length > 0 && (
         <div className="mt-3">
           <p className="text-xs text-neutral-600 mb-1">Skills:</p>
           <div className="flex flex-wrap gap-1">
-            {metadata.skills.slice(0, 5).map((skill) => (
+            {skills.slice(0, 5).map((skill) => (
               <Badge key={skill} variant="outline" className="text-xs">
                 {SKILL_LABELS[skill]}
               </Badge>
             ))}
-            {metadata.skills.length > 5 && (
+            {skills.length > 5 && (
               <Badge variant="outline" className="text-xs">
-                +{metadata.skills.length - 5} more
+                +{skills.length - 5} more
               </Badge>
             )}
           </div>
@@ -323,7 +334,8 @@ function RecommendationCard({
   isSelected: boolean;
   onSelect: () => void;
 }) {
-  const metadata = technician.metadata as TechnicianMetadata;
+  const metadata = (technician.metadata || {}) as Partial<TechnicianMetadata>;
+  const level = metadata.level ?? 'technician';
 
   return (
     <button
@@ -344,7 +356,7 @@ function RecommendationCard({
           <div>
             <h4 className="font-semibold text-neutral-900">{technician.displayName}</h4>
             <p className="text-xs text-neutral-600">
-              {TECHNICIAN_LEVEL_LABELS[metadata.level]} • {recommendation.currentWorkload} active jobs
+              {TECHNICIAN_LEVEL_LABELS[level]} • {recommendation.currentWorkload} active jobs
             </p>
           </div>
         </div>
@@ -374,8 +386,12 @@ function TechnicianListItem({
   isSelected: boolean;
   onSelect: () => void;
 }) {
-  const metadata = technician.metadata as TechnicianMetadata;
-  const isAvailable = metadata.availabilityStatus === 'available';
+  const metadata = (technician.metadata || {}) as Partial<TechnicianMetadata>;
+  const level = metadata.level ?? 'technician';
+  const currentJobs = Array.isArray(metadata.currentJobIds) ? metadata.currentJobIds.length : 0;
+  const maxJobs = metadata.maxJobsPerDay ?? 8;
+  const availability = metadata.availabilityStatus ?? 'available';
+  const isAvailable = availability === 'available';
 
   return (
     <button
@@ -394,8 +410,7 @@ function TechnicianListItem({
           <div>
             <h4 className="font-medium text-neutral-900">{technician.displayName}</h4>
             <p className="text-xs text-neutral-600">
-              {TECHNICIAN_LEVEL_LABELS[metadata.level]} •
-              {metadata.currentJobIds?.length || 0}/{metadata.maxJobsPerDay || 8} jobs
+              {TECHNICIAN_LEVEL_LABELS[level]} • {currentJobs}/{maxJobs} jobs
             </p>
           </div>
         </div>

@@ -52,6 +52,7 @@ import { ReviewForm } from '@/components/reviews/ReviewForm';
 import { submitReturnRequest, getReturnByOrderId } from '@/services/returnService';
 import type { Order, OrderStatus } from '@/types/product';
 import type { Review } from '@/types/review';
+import { toast } from '@/components/ui/use-toast';
 
 // Status configurations
 const STATUS_CONFIG: Record<
@@ -125,7 +126,11 @@ export function OrderDetails() {
     if (!order || !user || !profile) return;
 
     if (!returnReason || !returnDescription) {
-      alert('Please provide a reason and description for the return');
+      toast({
+        title: 'Return details required',
+        description: 'Please provide both a reason and description for the return.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -142,12 +147,20 @@ export function OrderDetails() {
         order.totalAmount
       );
 
-      alert('Return request submitted successfully! We will review it shortly.');
+      toast({
+        title: 'Return requested',
+        description: 'Your return request has been submitted for review.',
+        variant: 'success',
+      });
       setShowReturnDialog(false);
       await checkReturnRequest();
     } catch (error) {
       console.error('Error submitting return:', error);
-      alert('Failed to submit return request. Please try again.');
+      toast({
+        title: 'Return failed',
+        description: 'Failed to submit return request. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setSubmittingReturn(false);
     }
@@ -196,7 +209,11 @@ export function OrderDetails() {
     const canCancel = ['pending-payment', 'payment-confirmed', 'processing'].includes(order.orderStatus);
 
     if (!canCancel) {
-      alert('This order cannot be cancelled at this stage');
+      toast({
+        title: 'Cannot cancel order',
+        description: 'This order cannot be cancelled at its current stage.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -208,10 +225,18 @@ export function OrderDetails() {
     try {
       await cancelOrder(orderId, 'Cancelled by customer');
       await fetchOrder(); // Refresh order data
-      alert('Order cancelled successfully');
+      toast({
+        title: 'Order cancelled',
+        description: 'The order has been cancelled successfully.',
+        variant: 'success',
+      });
     } catch (error) {
       console.error('Error cancelling order:', error);
-      alert('Failed to cancel order. Please try again.');
+      toast({
+        title: 'Cancellation failed',
+        description: 'Failed to cancel order. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setCancelling(false);
     }
@@ -220,7 +245,11 @@ export function OrderDetails() {
   const copyTrackingNumber = () => {
     if (order?.trackingNumber) {
       navigator.clipboard.writeText(order.trackingNumber);
-      alert('Tracking number copied to clipboard!');
+      toast({
+        title: 'Tracking number copied',
+        description: 'The tracking number has been copied to your clipboard.',
+        variant: 'success',
+      });
     }
   };
 

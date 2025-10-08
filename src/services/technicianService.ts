@@ -33,7 +33,7 @@ import type {
  */
 export interface TechnicianProfile extends UserProfile {
   role: 'technician';
-  metadata: TechnicianMetadata;
+  metadata: Partial<TechnicianMetadata>;
 }
 
 /**
@@ -52,10 +52,14 @@ export async function getAllTechnicians(): Promise<TechnicianProfile[]> {
     const querySnapshot = await getDocs(q);
     const technicians: TechnicianProfile[] = [];
 
-    querySnapshot.forEach((doc) => {
-      const data = doc.data() as UserProfile;
+    querySnapshot.forEach((snapshot) => {
+      const data = snapshot.data() as UserProfile;
       if (data.role === 'technician') {
-        technicians.push(data as TechnicianProfile);
+        technicians.push({
+          ...(data as TechnicianProfile),
+          uid: data.uid || snapshot.id,
+          metadata: (data.metadata || {}) as Partial<TechnicianMetadata>,
+        });
       }
     });
 
@@ -74,11 +78,15 @@ export async function getAvailableTechnicians(): Promise<TechnicianProfile[]> {
   try {
     const allTechnicians = await getAllTechnicians();
 
-    return allTechnicians.filter(tech => {
-      const metadata = tech.metadata as TechnicianMetadata;
+    return allTechnicians.filter((tech) => {
+      const metadata = (tech.metadata || {}) as Partial<TechnicianMetadata>;
+      const availability = metadata.availabilityStatus ?? 'available';
+      const currentJobs = Array.isArray(metadata.currentJobIds) ? metadata.currentJobIds.length : 0;
+      const maxJobs = metadata.maxJobsPerDay ?? 8;
+
       return (
-        metadata.availabilityStatus === 'available' &&
-        (metadata.currentJobIds?.length || 0) < (metadata.maxJobsPerDay || 8)
+        availability === 'available' &&
+        currentJobs < maxJobs
       );
     });
   } catch (error) {
@@ -104,7 +112,11 @@ export async function getTechnicianById(uid: string): Promise<TechnicianProfile 
       throw new Error('User is not a technician');
     }
 
-    return data as TechnicianProfile;
+    return {
+      ...(data as TechnicianProfile),
+      uid: data.uid || userSnap.id,
+      metadata: (data.metadata || {}) as Partial<TechnicianMetadata>,
+    };
   } catch (error) {
     console.error('Error fetching technician:', error);
     throw new Error('Failed to fetch technician');
@@ -118,9 +130,9 @@ export async function getTechniciansBySkill(skill: TechnicianSkill): Promise<Tec
   try {
     const allTechnicians = await getAllTechnicians();
 
-    return allTechnicians.filter(tech => {
-      const metadata = tech.metadata as TechnicianMetadata;
-      return metadata.skills?.includes(skill);
+    return allTechnicians.filter((tech) => {
+      const metadata = (tech.metadata || {}) as Partial<TechnicianMetadata>;
+      return (metadata.skills || []).includes(skill);
     });
   } catch (error) {
     console.error('Error fetching technicians by skill:', error);
@@ -135,9 +147,9 @@ export async function getTechniciansByServiceArea(area: string): Promise<Technic
   try {
     const allTechnicians = await getAllTechnicians();
 
-    return allTechnicians.filter(tech => {
-      const metadata = tech.metadata as TechnicianMetadata;
-      return metadata.serviceAreas?.includes(area);
+    return allTechnicians.filter((tech) => {
+      const metadata = (tech.metadata || {}) as Partial<TechnicianMetadata>;
+      return (metadata.serviceAreas || []).includes(area);
     });
   } catch (error) {
     console.error('Error fetching technicians by area:', error);
@@ -181,18 +193,29 @@ export async function assignJobToTechnician(
     }
 
     const data = technicianSnap.data() as TechnicianProfile;
-    const metadata = data.metadata as TechnicianMetadata;
-    const currentJobs = metadata.currentJobIds || [];
+    const metadata = (data.metadata || {}) as TechnicianMetadata;
+    const currentJobs = Array.isArray(metadata.currentJobIds) ? metadata.currentJobIds : [];
+    const hasJobAlready = currentJobs.includes(jobId);
+    const newCurrentJobs = hasJobAlready ? currentJobs : [...currentJobs, jobId];
 
-    await updateDoc(technicianRef, {
-      'metadata.currentJobIds': [...currentJobs, jobId],
-      'metadata.totalJobsAssigned': (metadata.totalJobsAssigned || 0) + 1,
+    const updatePayload: Record<string, unknown> = {
+      'metadata.currentJobIds': newCurrentJobs,
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    if (!hasJobAlready) {
+      updatePayload['metadata.totalJobsAssigned'] = (metadata.totalJobsAssigned || 0) + 1;
+    }
+
+    if ((metadata.availabilityStatus ?? 'available') === 'available' && newCurrentJobs.length > 0) {
+      updatePayload['metadata.availabilityStatus'] = 'busy';
+    }
+
+    await updateDoc(technicianRef, updatePayload);
 
     // Auto-update availability if at capacity
     const maxJobs = metadata.maxJobsPerDay || 8;
-    if (currentJobs.length + 1 >= maxJobs) {
+    if (newCurrentJobs.length >= maxJobs) {
       await updateTechnicianAvailability(uid, 'busy');
     }
 
@@ -219,13 +242,21 @@ export async function removeJobFromTechnician(
     }
 
     const data = technicianSnap.data() as TechnicianProfile;
-    const metadata = data.metadata as TechnicianMetadata;
-    const currentJobs = (metadata.currentJobIds || []).filter(id => id !== jobId);
+    const metadata = (data.metadata || {}) as TechnicianMetadata;
+    const currentJobs = (Array.isArray(metadata.currentJobIds) ? metadata.currentJobIds : []).filter(
+      (id) => id !== jobId
+    );
 
-    await updateDoc(technicianRef, {
+    const updatePayload: Record<string, unknown> = {
       'metadata.currentJobIds': currentJobs,
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    if (currentJobs.length === 0) {
+      updatePayload['metadata.availabilityStatus'] = 'available';
+    }
+
+    await updateDoc(technicianRef, updatePayload);
 
     // Auto-update availability if below capacity
     const maxJobs = metadata.maxJobsPerDay || 8;
@@ -250,13 +281,13 @@ export function calculateMatchScore(
   serviceArea: string,
   complexity: JobComplexity
 ): number {
-  const metadata = technician.metadata as TechnicianMetadata;
+  const metadata = (technician.metadata || {}) as Partial<TechnicianMetadata>;
   let score = 0;
 
   // Skills match (40 points max)
   if (requiredSkills.length > 0) {
     const matchingSkills = requiredSkills.filter(skill =>
-      metadata.skills?.includes(skill)
+      (metadata.skills || []).includes(skill)
     );
     const skillMatchRate = matchingSkills.length / requiredSkills.length;
     score += skillMatchRate * 40;
@@ -265,24 +296,24 @@ export function calculateMatchScore(
   }
 
   // Service area match (20 points)
-  if (metadata.serviceAreas?.includes(serviceArea)) {
+  if ((metadata.serviceAreas || []).includes(serviceArea)) {
     score += 20;
   }
 
   // Level appropriate for complexity (20 points)
-  const levelScore = getLevelScore(metadata.level, complexity);
+  const levelScore = getLevelScore(metadata.level ?? 'technician', complexity);
   score += levelScore * 20;
 
   // Availability (10 points)
-  if (metadata.availabilityStatus === 'available') {
+  if ((metadata.availabilityStatus ?? 'available') === 'available') {
     score += 10;
   } else if (metadata.availabilityStatus === 'emergency') {
     score += 5;
   }
 
   // Workload (10 points)
-  const currentJobs = metadata.currentJobIds?.length || 0;
-  const maxJobs = metadata.maxJobsPerDay || 8;
+  const currentJobs = Array.isArray(metadata.currentJobIds) ? metadata.currentJobIds.length : 0;
+  const maxJobs = metadata.maxJobsPerDay ?? 8;
   const workloadScore = Math.max(0, 1 - (currentJobs / maxJobs));
   score += workloadScore * 10;
 
@@ -332,42 +363,43 @@ export async function getAssignmentRecommendations(
   try {
     const allTechnicians = await getAllTechnicians();
 
-    const recommendations: AssignmentRecommendation[] = allTechnicians.map(tech => {
-      const metadata = tech.metadata as TechnicianMetadata;
+    const recommendations: AssignmentRecommendation[] = allTechnicians.map((tech) => {
+      const metadata = (tech.metadata || {}) as Partial<TechnicianMetadata>;
       const matchScore = calculateMatchScore(tech, requiredSkills, serviceArea, complexity);
 
-      const matchingSkills = requiredSkills.filter(skill =>
-        metadata.skills?.includes(skill)
-      );
-      const missingSkills = requiredSkills.filter(skill =>
-        !metadata.skills?.includes(skill)
-      );
+      const skills = metadata.skills || [];
+      const matchingSkills = requiredSkills.filter((skill) => skills.includes(skill));
+      const missingSkills = requiredSkills.filter((skill) => !skills.includes(skill));
 
       const reasons: string[] = [];
       if (matchingSkills.length > 0) {
         reasons.push(`✓ Has ${matchingSkills.length}/${requiredSkills.length} required skills`);
       }
-      if (metadata.serviceAreas?.includes(serviceArea)) {
+      if ((metadata.serviceAreas || []).includes(serviceArea)) {
         reasons.push(`✓ Covers ${serviceArea}`);
       }
-      if (metadata.availabilityStatus === 'available') {
+      const availability = metadata.availabilityStatus ?? 'available';
+      if (availability === 'available') {
         reasons.push('✓ Available now');
       }
-      const currentJobs = metadata.currentJobIds?.length || 0;
-      if (currentJobs < (metadata.maxJobsPerDay || 8)) {
-        reasons.push(`✓ Capacity: ${currentJobs}/${metadata.maxJobsPerDay || 8} jobs`);
+      const currentJobs = Array.isArray(metadata.currentJobIds) ? metadata.currentJobIds.length : 0;
+      const maxJobs = metadata.maxJobsPerDay ?? 8;
+      if (currentJobs < maxJobs) {
+        reasons.push(`✓ Capacity: ${currentJobs}/${maxJobs} jobs`);
       }
 
       return {
         type: 'technician',
         technicianId: tech.uid,
         technicianName: tech.displayName,
-        technicianLevel: metadata.level,
+        technicianLevel: metadata.level ?? 'technician',
         matchScore,
         reasons,
-        availability: metadata.availabilityStatus,
+        availability,
         currentWorkload: currentJobs,
-        hasRequiredSkills: matchingSkills.length === requiredSkills.length,
+        hasRequiredSkills: requiredSkills.length > 0
+          ? matchingSkills.length === requiredSkills.length
+          : true,
         matchingSkills,
         missingSkills,
       };

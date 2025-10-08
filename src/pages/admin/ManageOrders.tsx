@@ -52,6 +52,7 @@ import { formatCurrency } from '@/lib/utils';
 import { exportOrdersToCSV, exportDetailedOrdersToCSV } from '@/utils/exportToCSV';
 import { printPackingSlip } from '@/utils/printInvoice';
 import type { Order, OrderStatus } from '@/types/product';
+import { toast } from '@/components/ui/use-toast';
 
 // Status configurations
 const STATUS_CONFIG: Record<
@@ -147,12 +148,20 @@ export default function ManageOrders() {
         await updateTrackingNumber(selectedOrder.id, trackingNumber);
       }
 
-      alert('Order updated successfully!');
+      toast({
+        title: 'Order updated',
+        description: `${selectedOrder.orderNumber} has been updated successfully.`,
+        variant: 'success',
+      });
       setUpdateDialogOpen(false);
       await fetchOrders();
     } catch (error) {
       console.error('Error updating order:', error);
-      alert('Failed to update order. Please try again.');
+      toast({
+        title: 'Update failed',
+        description: 'Failed to update order. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setUpdating(false);
     }
@@ -185,13 +194,21 @@ export default function ManageOrders() {
       );
       await Promise.all(updatePromises);
 
-      alert(`Successfully updated ${selectedOrders.size} orders!`);
+      toast({
+        title: 'Bulk update successful',
+        description: `Updated ${selectedOrders.size} order${selectedOrders.size === 1 ? '' : 's'} successfully.`,
+        variant: 'success',
+      });
       setBulkDialogOpen(false);
       setSelectedOrders(new Set());
       await fetchOrders();
     } catch (error) {
       console.error('Error bulk updating orders:', error);
-      alert('Failed to update some orders. Please try again.');
+      toast({
+        title: 'Bulk update failed',
+        description: 'Failed to update some orders. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setBulkUpdating(false);
     }

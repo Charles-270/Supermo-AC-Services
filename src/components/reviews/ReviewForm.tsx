@@ -13,6 +13,7 @@ import { Star, Upload, X, Loader2 } from 'lucide-react';
 import { createReview } from '@/services/reviewService';
 import { useAuth } from '@/hooks/useAuth';
 import type { ReviewFormData } from '@/types/review';
+import { toast } from '@/components/ui/use-toast';
 
 interface ReviewFormProps {
   orderId: string;
@@ -45,17 +46,29 @@ export function ReviewForm({ orderId, orderNumber, onSuccess }: ReviewFormProps)
     e.preventDefault();
 
     if (!user || !profile) {
-      alert('You must be logged in to submit a review');
+      toast({
+        title: 'Sign in required',
+        description: 'You must be logged in to submit a review.',
+        variant: 'destructive',
+      });
       return;
     }
 
     if (rating === 0) {
-      alert('Please select a rating');
+      toast({
+        title: 'Rating missing',
+        description: 'Please select a rating before submitting your review.',
+        variant: 'destructive',
+      });
       return;
     }
 
     if (!title.trim() || !comment.trim()) {
-      alert('Please provide a title and comment');
+      toast({
+        title: 'Review incomplete',
+        description: 'Please provide both a title and a comment.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -78,11 +91,19 @@ export function ReviewForm({ orderId, orderNumber, onSuccess }: ReviewFormProps)
         reviewData
       );
 
-      alert('Thank you for your review!');
+      toast({
+        title: 'Review submitted',
+        description: 'Thank you for sharing your experience.',
+        variant: 'success',
+      });
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error('Error submitting review:', error);
-      alert('Failed to submit review. Please try again.');
+      toast({
+        title: 'Submission failed',
+        description: 'Failed to submit review. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setSubmitting(false);
     }

@@ -19,6 +19,11 @@ import {
 import type { Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Booking, BookingFormData, BookingStatus } from '@/types/booking';
+import {
+  assignJobToTechnician,
+  removeJobFromTechnician,
+  getTechnicianById,
+} from '@/services/technicianService';
 
 /**
  * Create a new booking
@@ -159,11 +164,29 @@ export async function updateBookingStatus(
 ): Promise<void> {
   try {
     const bookingRef = doc(db, 'bookings', bookingId);
+    const bookingSnap = await getDoc(bookingRef);
+
+    if (!bookingSnap.exists()) {
+      throw new Error('Booking not found');
+    }
+
+    const bookingData = {
+      id: bookingSnap.id,
+      ...bookingSnap.data(),
+    } as Booking;
+
     await updateDoc(bookingRef, {
       status,
       updatedAt: serverTimestamp(),
       ...(status === 'completed' && { completedAt: serverTimestamp() }),
     });
+
+    if (
+      (status === 'completed' || status === 'cancelled') &&
+      bookingData.technicianId
+    ) {
+      await removeJobFromTechnician(bookingData.technicianId, bookingId);
+    }
 
     console.log('✅ Booking status updated:', bookingId, '→', status);
   } catch (error) {
@@ -182,13 +205,42 @@ export async function assignTechnician(
 ): Promise<void> {
   try {
     const bookingRef = doc(db, 'bookings', bookingId);
-    await updateDoc(bookingRef, {
+    const bookingSnap = await getDoc(bookingRef);
+
+    if (!bookingSnap.exists()) {
+      throw new Error('Booking not found');
+    }
+
+    const bookingData = {
+      id: bookingSnap.id,
+      ...bookingSnap.data(),
+    } as Booking;
+
+    const previousTechnicianId = bookingData.technicianId;
+    const technicianProfile = await getTechnicianById(technicianId);
+
+    const bookingUpdates: Record<string, unknown> = {
       technicianId,
       technicianName,
       assignedDate: serverTimestamp(),
       status: 'confirmed',
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    if (technicianProfile) {
+      bookingUpdates.technicianEmail = technicianProfile.email;
+      if (technicianProfile.phoneNumber) {
+        bookingUpdates.technicianPhone = technicianProfile.phoneNumber;
+      }
+    }
+
+    await Promise.all([
+      updateDoc(bookingRef, bookingUpdates),
+      assignJobToTechnician(technicianId, bookingId),
+      ...(previousTechnicianId && previousTechnicianId !== technicianId
+        ? [removeJobFromTechnician(previousTechnicianId, bookingId)]
+        : []),
+    ]);
 
     console.log('✅ Technician assigned to booking:', bookingId, '→', technicianName);
   } catch (error) {
@@ -210,12 +262,27 @@ export async function completeBooking(
 ): Promise<void> {
   try {
     const bookingRef = doc(db, 'bookings', bookingId);
+    const bookingSnap = await getDoc(bookingRef);
+
+    if (!bookingSnap.exists()) {
+      throw new Error('Booking not found');
+    }
+
+    const bookingData = {
+      id: bookingSnap.id,
+      ...bookingSnap.data(),
+    } as Booking;
+
     await updateDoc(bookingRef, {
       ...completionData,
       status: 'completed',
       completedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+
+    if (bookingData.technicianId) {
+      await removeJobFromTechnician(bookingData.technicianId, bookingId);
+    }
 
     console.log('✅ Booking completed:', bookingId);
   } catch (error) {
@@ -253,10 +320,25 @@ export async function addBookingReview(
 export async function cancelBooking(bookingId: string): Promise<void> {
   try {
     const bookingRef = doc(db, 'bookings', bookingId);
+    const bookingSnap = await getDoc(bookingRef);
+
+    if (!bookingSnap.exists()) {
+      throw new Error('Booking not found');
+    }
+
+    const bookingData = {
+      id: bookingSnap.id,
+      ...bookingSnap.data(),
+    } as Booking;
+
     await updateDoc(bookingRef, {
       status: 'cancelled',
       updatedAt: serverTimestamp(),
     });
+
+    if (bookingData.technicianId) {
+      await removeJobFromTechnician(bookingData.technicianId, bookingId);
+    }
 
     console.log('✅ Booking cancelled:', bookingId);
   } catch (error) {

@@ -31,7 +31,9 @@ import {
   convertToPesewas,
   getPaystackChannels,
   loadPaystackScript,
+  verifyPayment,
 } from '@/lib/paystack';
+import { toast } from '@/components/ui/use-toast';
 
 export function Checkout() {
   const navigate = useNavigate();
@@ -82,13 +84,22 @@ export function Checkout() {
     e.preventDefault();
 
     if (!user || !profile) {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in to complete your purchase.',
+        variant: 'destructive',
+      });
       navigate('/');
       return;
     }
 
     // Validate form
     if (!fullName || !phone || !address || !city || !region) {
-      alert('Please fill in all required fields');
+      toast({
+        title: 'Missing information',
+        description: 'Please complete all required shipping details.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -165,11 +176,29 @@ export function Checkout() {
             },
             channels: getPaystackChannels(paymentMethod),
           },
-          (response) => {
+          async (response) => {
             // Payment successful
             console.log('Payment successful:', response);
-            clearCart();
-            navigate(`/orders/${orderId}/success?reference=${response.reference}`);
+            try {
+              const verified = await verifyPayment(orderId, response.reference);
+              if (!verified) {
+                toast({
+                  title: 'Payment pending verification',
+                  description: 'We could not confirm the payment yet. We will update your order once verification completes.',
+                });
+              }
+            } catch (verifyError) {
+              console.error('Error verifying payment:', verifyError);
+              toast({
+                title: 'Verification error',
+                description: 'Payment succeeded but verification failed. Your order will update once confirmed.',
+                variant: 'destructive',
+              });
+            } finally {
+              clearCart();
+              setLoading(false);
+              navigate(`/orders/${orderId}/success?reference=${response.reference}`);
+            }
           },
           () => {
             // Payment closed
@@ -182,7 +211,11 @@ export function Checkout() {
       }
     } catch (error) {
       console.error('Error creating order:', error);
-      alert('Failed to create order. Please try again.');
+      toast({
+        title: 'Order failed',
+        description: 'Failed to create order. Please try again.',
+        variant: 'destructive',
+      });
       setLoading(false);
     }
   };

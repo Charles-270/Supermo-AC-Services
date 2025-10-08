@@ -29,6 +29,7 @@ import {
   TIME_SLOT_LABELS,
 } from '@/types/booking';
 import { formatCurrency } from '@/lib/utils';
+import { toast } from '@/components/ui/use-toast';
 
 // Status workflow for technicians
 const STATUS_WORKFLOW: Record<BookingStatus, BookingStatus | null> = {
@@ -114,7 +115,11 @@ export default function JobDetail() {
       await loadJobDetails();
     } catch (err) {
       console.error('Error updating status:', err);
-      alert('Failed to update job status');
+      toast({
+        title: 'Update failed',
+        description: 'Failed to update job status. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setUpdating(false);
     }

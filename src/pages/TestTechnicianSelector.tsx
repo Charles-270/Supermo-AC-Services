@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { addTestTechnicians } from '@/scripts/addTestTechnicians';
 import { CheckCircle } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 
 export function TestTechnicianSelector() {
   const [selectedTechId, setSelectedTechId] = useState('');
@@ -19,12 +20,25 @@ export function TestTechnicianSelector() {
   const handleAddTestData = async () => {
     try {
       setAdding(true);
-      await addTestTechnicians();
+      const result = await addTestTechnicians();
       setTestDataAdded(true);
-      alert('✅ Test technicians added successfully! Refresh the page.');
+      toast({
+        title: 'Test data added',
+        description: result?.count
+          ? `Seeded ${result.count} technician profiles.`
+          : 'Test technicians added successfully!',
+        variant: 'success',
+      });
     } catch (error) {
       console.error('Error adding test data:', error);
-      alert('❌ Error adding test data. Check console for details.');
+      const isPermissionError = (error as { code?: string }).code === 'functions/permission-denied';
+      toast({
+        title: 'Failed to add test data',
+        description: isPermissionError
+          ? 'Admin privileges are required to seed technicians.'
+          : 'Check the console for more details.',
+        variant: 'destructive',
+      });
     } finally {
       setAdding(false);
     }

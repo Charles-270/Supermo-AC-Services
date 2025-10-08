@@ -3,13 +3,18 @@
  */
 
 import type { Order } from '@/types/product';
+import { toast } from '@/components/ui/use-toast';
 
 /**
  * Convert orders data to CSV format
  */
 export function exportOrdersToCSV(orders: Order[], filename = 'orders.csv') {
   if (orders.length === 0) {
-    alert('No orders to export');
+    toast({
+      title: 'Nothing to export',
+      description: 'There are no orders to export right now.',
+      variant: 'destructive',
+    });
     return;
   }
 
@@ -85,7 +90,11 @@ export function exportOrdersToCSV(orders: Order[], filename = 'orders.csv') {
  */
 export function exportDetailedOrdersToCSV(orders: Order[], filename = 'orders-detailed.csv') {
   if (orders.length === 0) {
-    alert('No orders to export');
+    toast({
+      title: 'Nothing to export',
+      description: 'There are no orders to export right now.',
+      variant: 'destructive',
+    });
     return;
   }
 

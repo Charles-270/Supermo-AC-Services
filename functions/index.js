@@ -8,6 +8,317 @@ const admin = require('firebase-admin');
 
 admin.initializeApp();
 
+const PAYSTACK_VERIFY_URL = 'https://api.paystack.co/transaction/verify/';
+
+const PAYSTACK_VERIFY_URL = 'https://api.paystack.co/transaction/verify/';
+
+/**
+ * Seed technician test data (server-side to bypass client security rule limits)
+ */
+const technicianSeedData = [
+  {
+    uid: 'tech_001',
+    email: 'john.mensah@supremo.com',
+    displayName: 'John Mensah',
+    phoneNumber: '+233201234567',
+    role: 'technician',
+    metadata: {
+      level: 'senior',
+      yearsOfExperience: 6,
+      skills: ['ac_installation', 'ac_repair', 'electrical', 'diagnostics'],
+      certifications: [],
+      primarySpecialization: 'ac_installation',
+      isTeamLead: false,
+      serviceAreas: ['Accra', 'Tema'],
+      maxJobsPerDay: 8,
+      canWorkAlone: true,
+      availabilityStatus: 'available',
+      currentJobIds: [],
+      totalJobsCompleted: 124,
+      totalJobsAssigned: 130,
+      averageRating: 4.7,
+      firstTimeFixRate: 88.5,
+      averageJobDuration: 3.2,
+      hasVehicle: true,
+      vehicleType: 'Van',
+      hasToolKit: true,
+      isEmergencyTechnician: true,
+    },
+    isActive: true,
+    isEmailVerified: true,
+    isPhoneVerified: true,
+    isApproved: true,
+  },
+  {
+    uid: 'tech_002',
+    email: 'kwame.osei@supremo.com',
+    displayName: 'Kwame Osei',
+    phoneNumber: '+233207654321',
+    role: 'technician',
+    metadata: {
+      level: 'lead',
+      yearsOfExperience: 9,
+      skills: ['ac_installation', 'ac_repair', 'commercial_systems', 'ductwork', 'diagnostics', 'welding'],
+      certifications: [],
+      primarySpecialization: 'commercial_systems',
+      isTeamLead: false,
+      serviceAreas: ['Accra', 'Kumasi'],
+      maxJobsPerDay: 6,
+      canWorkAlone: true,
+      availabilityStatus: 'available',
+      currentJobIds: [],
+      totalJobsCompleted: 287,
+      totalJobsAssigned: 295,
+      averageRating: 4.9,
+      firstTimeFixRate: 92.3,
+      averageJobDuration: 4.5,
+      hasVehicle: true,
+      vehicleType: 'Truck',
+      hasToolKit: true,
+      isEmergencyTechnician: true,
+    },
+    isActive: true,
+    isEmailVerified: true,
+    isPhoneVerified: true,
+    isApproved: true,
+  },
+  {
+    uid: 'tech_003',
+    email: 'ama.boateng@supremo.com',
+    displayName: 'Ama Boateng',
+    phoneNumber: '+233245678901',
+    role: 'technician',
+    metadata: {
+      level: 'technician',
+      yearsOfExperience: 4,
+      skills: ['ac_repair', 'preventive_maintenance', 'residential_systems', 'hvac_controls'],
+      certifications: [],
+      primarySpecialization: 'preventive_maintenance',
+      isTeamLead: false,
+      serviceAreas: ['Accra', 'Tema', 'Kasoa'],
+      maxJobsPerDay: 10,
+      canWorkAlone: true,
+      availabilityStatus: 'available',
+      currentJobIds: ['job_001', 'job_002'],
+      totalJobsCompleted: 89,
+      totalJobsAssigned: 92,
+      averageRating: 4.6,
+      firstTimeFixRate: 85.2,
+      averageJobDuration: 2.8,
+      hasVehicle: true,
+      vehicleType: 'Motorcycle',
+      hasToolKit: true,
+      isEmergencyTechnician: false,
+    },
+    isActive: true,
+    isEmailVerified: true,
+    isPhoneVerified: true,
+    isApproved: true,
+  },
+  {
+    uid: 'tech_004',
+    email: 'kofi.asante@supremo.com',
+    displayName: 'Kofi Asante',
+    phoneNumber: '+233209876543',
+    role: 'technician',
+    metadata: {
+      level: 'junior',
+      yearsOfExperience: 2,
+      skills: ['ac_repair', 'preventive_maintenance', 'residential_systems'],
+      certifications: [],
+      primarySpecialization: 'ac_repair',
+      isTeamLead: false,
+      serviceAreas: ['Tema', 'Ashaiman'],
+      maxJobsPerDay: 8,
+      canWorkAlone: true,
+      availabilityStatus: 'busy',
+      currentJobIds: ['job_003', 'job_004', 'job_005', 'job_006', 'job_007', 'job_008'],
+      totalJobsCompleted: 34,
+      totalJobsAssigned: 38,
+      averageRating: 4.3,
+      firstTimeFixRate: 78.9,
+      averageJobDuration: 3.5,
+      hasVehicle: false,
+      hasToolKit: true,
+      isEmergencyTechnician: false,
+    },
+    isActive: true,
+    isEmailVerified: true,
+    isPhoneVerified: true,
+    isApproved: true,
+  },
+  {
+    uid: 'tech_005',
+    email: 'akosua.frimpong@supremo.com',
+    displayName: 'Akosua Frimpong',
+    phoneNumber: '+233241122334',
+    role: 'technician',
+    metadata: {
+      level: 'senior',
+      yearsOfExperience: 7,
+      skills: ['refrigeration', 'ac_installation', 'diagnostics', 'commercial_systems'],
+      certifications: [],
+      primarySpecialization: 'refrigeration',
+      isTeamLead: false,
+      serviceAreas: ['Accra', 'Tema'],
+      maxJobsPerDay: 7,
+      canWorkAlone: true,
+      availabilityStatus: 'available',
+      currentJobIds: ['job_009'],
+      totalJobsCompleted: 156,
+      totalJobsAssigned: 162,
+      averageRating: 4.8,
+      firstTimeFixRate: 90.1,
+      averageJobDuration: 3.7,
+      hasVehicle: true,
+      vehicleType: 'Van',
+      hasToolKit: true,
+      isEmergencyTechnician: true,
+    },
+    isActive: true,
+    isEmailVerified: true,
+    isPhoneVerified: true,
+    isApproved: true,
+  },
+];
+
+exports.seedTechnicians = functions
+  .region('europe-west1')
+  .https.onCall(async (_data, context) => {
+    if (!context.auth || context.auth.token.role !== 'admin') {
+      throw new functions.https.HttpsError('permission-denied', 'Admin access required.');
+    }
+
+    const firestore = admin.firestore();
+    const batch = firestore.batch();
+
+    technicianSeedData.forEach((technician) => {
+      const docRef = firestore.doc(`users/${technician.uid}`);
+      batch.set(
+        docRef,
+        {
+          ...technician,
+          metadata: {
+            ...technician.metadata,
+            teamId: technician.metadata.teamId || null,
+          },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+
+    await batch.commit();
+
+    return {
+      success: true,
+      count: technicianSeedData.length,
+    };
+  });
+
+/**
+ * Verify Paystack payment and update related order
+ */
+exports.verifyPaystackPayment = functions
+  .region('europe-west1')
+  .https.onCall(async (data, context) => {
+    const { reference, orderId } = data || {};
+
+    if (!reference || !orderId) {
+      throw new functions.https.HttpsError('invalid-argument', 'reference and orderId are required.');
+    }
+
+    const secretKey = functions.config().paystack && functions.config().paystack.secret;
+    if (!secretKey) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Paystack secret key not configured. Run: firebase functions:config:set paystack.secret="YOUR_SECRET_KEY"'
+      );
+    }
+
+    const firestore = admin.firestore();
+    const orderRef = firestore.collection('orders').doc(orderId);
+    const orderSnap = await orderRef.get();
+
+    if (!orderSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Order not found.');
+    }
+
+    const orderData = orderSnap.data();
+    const isAdmin = context.auth?.token?.role === 'admin';
+    const isOwner = context.auth && orderData.customerId === context.auth.uid;
+
+    if (context.auth && !isOwner && !isAdmin) {
+      throw new functions.https.HttpsError('permission-denied', 'You do not have access to this order.');
+    }
+
+    try {
+      const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Paystack verify failed: ${response.status} ${errorText}`);
+      }
+
+      const payload = await response.json();
+      const paystackData = payload?.data;
+
+      if (!payload?.status || !paystackData || paystackData.status !== 'success') {
+        throw new Error('Payment not successful or still pending confirmation.');
+      }
+
+      const metadata = paystackData.metadata || {};
+      if (metadata.orderId && metadata.orderId !== orderId) {
+        throw new Error('Paystack metadata order mismatch.');
+      }
+
+      const paidAtDate = paystackData.paid_at ? new Date(paystackData.paid_at) : null;
+      const transactionEntry = {
+        gateway: 'paystack',
+        reference,
+        status: paystackData.status,
+        channel: paystackData.channel,
+        currency: paystackData.currency,
+        amount: typeof paystackData.amount === 'number' ? paystackData.amount / 100 : null,
+        paidAt: paystackData.paid_at || null,
+        createdAt: paystackData.created_at || null,
+      };
+
+      const updates = {
+        paymentStatus: 'paid',
+        paymentReference: reference,
+        paymentGateway: 'paystack',
+        paidAt: paidAtDate
+          ? admin.firestore.Timestamp.fromDate(paidAtDate)
+          : admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        transactions: admin.firestore.FieldValue.arrayUnion(transactionEntry),
+      };
+
+      if (orderData.orderStatus === 'pending-payment') {
+        updates.orderStatus = 'payment-confirmed';
+      }
+
+      await orderRef.update(updates);
+
+      return {
+        success: true,
+        orderId,
+        reference,
+        amount: transactionEntry.amount,
+      };
+    } catch (error) {
+      console.error('Paystack verification failed:', error);
+      throw new functions.https.HttpsError('internal', error.message || 'Unable to verify payment.');
+    }
+  });
+
 /**
  * Send booking confirmation email when a new booking is created
  */

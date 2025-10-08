@@ -83,6 +83,8 @@ export interface Booking {
   // Assignment
   technicianId?: string;
   technicianName?: string;
+  technicianEmail?: string;
+  technicianPhone?: string;
   assignedDate?: Timestamp;
 
   // Status & Tracking

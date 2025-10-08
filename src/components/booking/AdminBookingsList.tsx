@@ -9,8 +9,6 @@ import { TechnicianSelector } from '@/components/admin/TechnicianSelector';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -25,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Calendar, Clock, MapPin, User, Loader2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Loader2, Phone, Mail } from 'lucide-react';
 import type { Booking, BookingStatus } from '@/types/booking';
 import {
   SERVICE_TYPE_LABELS,
@@ -89,6 +87,8 @@ export function AdminBookingsList() {
 
   const openAssignDialog = (booking: Booking) => {
     setSelectedBooking(booking);
+    setSelectedTechnicianId(booking.technicianId || '');
+    setSelectedTechnicianName(booking.technicianName || '');
     setAssignDialogOpen(true);
   };
 
@@ -153,9 +153,23 @@ export function AdminBookingsList() {
                     </div>
 
                     {booking.technicianName && (
-                      <p className="mt-2 text-sm text-primary-600 font-medium">
-                        Assigned to: {booking.technicianName}
-                      </p>
+                      <div className="mt-2 space-y-1 text-sm text-primary-700">
+                        <p className="font-semibold">Assigned to: {booking.technicianName}</p>
+                        <div className="flex flex-wrap gap-3 text-primary-600">
+                          {booking.technicianPhone && (
+                            <span className="flex items-center gap-1">
+                              <Phone className="h-3.5 w-3.5" />
+                              {booking.technicianPhone}
+                            </span>
+                          )}
+                          {booking.technicianEmail && (
+                            <span className="flex items-center gap-1">
+                              <Mail className="h-3.5 w-3.5" />
+                              {booking.technicianEmail}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     )}
 
                     {booking.serviceDetails.issueDescription && (
@@ -173,12 +187,13 @@ export function AdminBookingsList() {
                     )}
 
                     <div className="flex flex-wrap gap-2">
-                      {booking.status === 'pending' && (
+                      {booking.status !== 'completed' && booking.status !== 'cancelled' && (
                         <Button
                           size="sm"
+                          variant={booking.technicianId ? 'outline' : 'default'}
                           onClick={() => openAssignDialog(booking)}
                         >
-                          Assign Technician
+                          {booking.technicianId ? 'Reassign Technician' : 'Assign Technician'}
                         </Button>
                       )}
 

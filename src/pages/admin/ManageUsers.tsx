@@ -60,6 +60,7 @@ import {
 } from '@/services/userService';
 import type { UserProfile, UserRole } from '@/types/user';
 import { USER_ROLE_LABELS } from '@/types/user';
+import { toast } from '@/components/ui/use-toast';
 
 export default function ManageUsers() {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -192,9 +193,44 @@ export default function ManageUsers() {
       await fetchPendingUsers();
       setActionDialogOpen(false);
       setSelectedUser(null);
+      const actionMessages: Record<typeof actionType, { title: string; description: string; variant?: 'success' | 'default' | 'destructive' }> = {
+        approve: {
+          title: 'User approved',
+          description: `${selectedUser.displayName} can now access the platform.`,
+          variant: 'success',
+        },
+        deactivate: {
+          title: 'User deactivated',
+          description: `${selectedUser.displayName}'s account is now inactive.`,
+        },
+        activate: {
+          title: 'User reactivated',
+          description: `${selectedUser.displayName} can log in again.`,
+          variant: 'success',
+        },
+        delete: {
+          title: 'User removed',
+          description: `${selectedUser.displayName}'s access has been revoked.`,
+        },
+        role: {
+          title: 'Role updated',
+          description: `${selectedUser.displayName} is now a ${USER_ROLE_LABELS[newRole]}.`,
+          variant: 'success',
+        },
+      };
+      const message = actionMessages[actionType];
+      toast({
+        title: message.title,
+        description: message.description,
+        variant: message.variant ?? 'default',
+      });
     } catch (error) {
       console.error('Error performing action:', error);
-      alert('Failed to perform action. Please try again.');
+      toast({
+        title: 'Action failed',
+        description: 'Failed to perform action. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setProcessing(false);
     }
@@ -211,9 +247,18 @@ export default function ManageUsers() {
       await fetchUsers();
       await fetchPendingUsers();
       setSelectedUsers(new Set());
+      toast({
+        title: 'Users approved',
+        description: `${selectedUsers.size} account${selectedUsers.size === 1 ? '' : 's'} have been approved.`,
+        variant: 'success',
+      });
     } catch (error) {
       console.error('Error bulk approving:', error);
-      alert('Failed to approve users. Please try again.');
+      toast({
+        title: 'Bulk approval failed',
+        description: 'Failed to approve users. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setProcessing(false);
     }

@@ -15,6 +15,7 @@ import { Loader2, Plus, X, PenTool } from 'lucide-react';
 import { completeBooking } from '@/services/bookingService';
 import type { Booking } from '@/types/booking';
 import { formatCurrency } from '@/lib/utils';
+import { toast } from '@/components/ui/use-toast';
 
 interface ServiceReportFormProps {
   booking: Booking;
@@ -109,7 +110,11 @@ export function ServiceReportForm({ booking, onComplete }: ServiceReportFormProp
 
   const addPart = () => {
     if (!newPart.name || newPart.quantity <= 0 || newPart.cost < 0) {
-      alert('Please fill in all part details');
+      toast({
+        title: 'Incomplete part details',
+        description: 'Please provide a name, quantity, and cost before adding a part.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -131,7 +136,11 @@ export function ServiceReportForm({ booking, onComplete }: ServiceReportFormProp
     e.preventDefault();
 
     if (!serviceNotes.trim()) {
-      alert('Please provide service notes');
+      toast({
+        title: 'Service notes required',
+        description: 'Please provide service notes before completing the job.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -162,7 +171,11 @@ export function ServiceReportForm({ booking, onComplete }: ServiceReportFormProp
 
       await completeBooking(booking.id, completionData);
 
-      alert('Job completed successfully!');
+      toast({
+        title: 'Job completed',
+        description: 'The service report has been submitted successfully.',
+        variant: 'success',
+      });
 
       if (onComplete) {
         onComplete();
@@ -171,7 +184,11 @@ export function ServiceReportForm({ booking, onComplete }: ServiceReportFormProp
       }
     } catch (error) {
       console.error('Error completing job:', error);
-      alert('Failed to complete job. Please try again.');
+      toast({
+        title: 'Completion failed',
+        description: 'Failed to complete job. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setSubmitting(false);
     }
