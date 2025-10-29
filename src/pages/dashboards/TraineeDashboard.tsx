@@ -33,7 +33,26 @@ export function TraineeDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <Card className="border-primary-200 bg-primary-50 mb-8">
+    <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <CardTitle>Training Content is on the Way</CardTitle>
+        <CardDescription>We are finalizing interactive lessons, assessments, and certificates for technicians and trainees.</CardDescription>
+      </div>
+      <Badge variant="secondary" className="self-start">Launching Soon</Badge>
+    </CardHeader>
+    <CardContent className="text-sm text-neutral-700 space-y-2">
+      <p>
+        We are working with the instructor team to publish the first cohort of modules, including
+        safety refreshers, installation masterclasses, and certification prep.
+      </p>
+      <p>
+        Expect early access invites in the coming weeks. In the meantime, keep an eye on this space
+        for updates.
+      </p>
+    </CardContent>
+  </Card>
         {/* Progress Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>

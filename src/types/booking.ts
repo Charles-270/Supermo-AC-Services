@@ -68,6 +68,8 @@ export interface Booking {
 
   // Service Information
   serviceType: ServiceType;
+  servicePackage: ServicePackage; // Ultra-simple pricing tier
+  agreedPrice: number; // Locked price at booking time (GHS)
   serviceDetails: ServiceDetails;
 
   // Scheduling
@@ -129,6 +131,7 @@ export interface Booking {
  */
 export interface BookingFormData {
   serviceType: ServiceType;
+  servicePackage: ServicePackage; // Selected pricing tier
   serviceDetails: ServiceDetails;
   preferredDate: Date;
   preferredTimeSlot: 'morning' | 'afternoon' | 'evening';
@@ -167,6 +170,67 @@ export const SERVICE_BASE_PRICING: Record<ServiceType, number> = {
   maintenance: 150,
   repair: 200,
   inspection: 100,
+};
+
+/**
+ * Service Package Type (Ultra-Simple Pricing)
+ */
+export type ServicePackage = 'basic' | 'standard' | 'premium';
+
+/**
+ * Service Package Details
+ * Fixed pricing packages for easy customer understanding
+ */
+export interface ServicePackageDetails {
+  label: string;
+  price: number;
+  description: string;
+  icon: string; // Emoji for visual recognition
+  includes: string[];
+}
+
+/**
+ * Service Packages (Ghana Cedis - GHS)
+ * Ultra-simple pricing for non-tech-savvy users
+ */
+export const SERVICE_PACKAGES: Record<ServicePackage, ServicePackageDetails> = {
+  basic: {
+    label: 'Basic Service',
+    price: 150,
+    description: 'Inspection + Cleaning',
+    icon: '🔍',
+    includes: [
+      'AC unit inspection',
+      'Filter cleaning',
+      'Basic maintenance',
+      'Performance check',
+    ],
+  },
+  standard: {
+    label: 'Standard Service',
+    price: 350,
+    description: 'Repair + Parts',
+    icon: '🔧',
+    includes: [
+      'Everything in Basic',
+      'Minor repairs',
+      '1-2 replacement parts',
+      'Performance optimization',
+    ],
+  },
+  premium: {
+    label: 'Premium Service',
+    price: 600,
+    description: 'Major Repair/Installation',
+    icon: '⚡',
+    includes: [
+      'Everything in Standard',
+      'Major repairs',
+      'Multiple parts replacement',
+      'New installation (if needed)',
+      'Extended warranty',
+    ],
+  },
 };
 
 /**
@@ -222,3 +286,13 @@ export const GHANA_CITIES = [
   'Wa',
   'Other',
 ];
+
+/**
+ * Platform Commission for Service Bookings (Ultra-Simple)
+ * - Flat 10% commission for ALL technicians
+ * - No tiers, no negotiations
+ * - Technician gets 90%, platform keeps 10%
+ * - Commission deducted from finalCost after service completion
+ */
+export const BOOKING_PLATFORM_COMMISSION_RATE = 0.10; // 10% commission
+export const TECHNICIAN_PAYOUT_RATE = 0.90; // 90% to technician

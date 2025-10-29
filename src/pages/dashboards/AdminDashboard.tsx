@@ -5,12 +5,10 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminStats } from '@/hooks/useAdminStats';
-import { AdminBookingsList } from '@/components/booking/AdminBookingsList';
-import { SupplierManagement } from '@/components/admin/SupplierManagement';
-import { AdminApprovals } from '@/components/admin/AdminApprovals';
+import { AdminDashboardAlerts } from '@/components/admin/AdminDashboardAlerts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Shield, Users, BarChart3, Settings, Loader2, Package, Edit, ShoppingBag } from 'lucide-react';
+import { Shield, Users, BarChart3, Settings, Loader2, Package, Edit, ShoppingBag, Calendar, Store } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -93,9 +91,9 @@ export function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Admin Approval Requests - Priority Section */}
+        {/* Priority Alerts Section */}
         <div className="mb-8">
-          <AdminApprovals />
+          <AdminDashboardAlerts />
         </div>
 
         {/* Management Sections */}
@@ -207,13 +205,50 @@ export function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Supplier Management */}
-        <div className="mb-8">
-          <SupplierManagement />
-        </div>
+        {/* Supplier & Bookings Management */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Store className="h-5 w-5 text-success-600" />
+                Supplier Management
+              </CardTitle>
+              <CardDescription>
+                Manage and approve supplier accounts
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => navigate('/admin/manage-suppliers')}
+              >
+                Manage Suppliers
+              </Button>
+            </CardContent>
+          </Card>
 
-        {/* Bookings Management */}
-        <AdminBookingsList />
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-warning-600" />
+                Bookings Management
+              </CardTitle>
+              <CardDescription>
+                View and manage service bookings
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => navigate('/admin/manage-bookings')}
+              >
+                Manage Bookings
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );

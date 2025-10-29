@@ -20,6 +20,7 @@ import {
   serverTimestamp,
   Timestamp,
   DocumentSnapshot,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type {
@@ -32,7 +33,32 @@ import type {
   PaymentMethod,
   OrderStatus,
   PaymentStatus,
+  SupplierAssignment,
+  SupplierAssignmentStatus,
+  SupplierAssignmentItem,
 } from '@/types/product';
+import { normalizeProductPricing } from '@/utils/pricing';
+
+const applyPricingUpdates = async (
+  productId: string,
+  updates?: Partial<Pick<Product, 'price' | 'compareAtPrice'>>
+) => {
+  if (!updates || Object.keys(updates).length === 0) {
+    return;
+  }
+
+  try {
+    await updateDoc(doc(db, 'products', productId), {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.warn(
+      `[productService] Skipped pricing normalization for product ${productId}`,
+      error
+    );
+  }
+};
 
 /**
  * Create a new product (Supplier/Admin only)
@@ -80,10 +106,16 @@ export async function getProduct(productId: string): Promise<Product | null> {
     const productSnap = await getDoc(productRef);
 
     if (productSnap.exists()) {
-      return {
+      const rawProduct = {
         id: productSnap.id,
         ...productSnap.data(),
       } as Product;
+
+      const { normalized, updates } = normalizeProductPricing(rawProduct);
+
+      await applyPricingUpdates(rawProduct.id, updates);
+
+      return normalized;
     }
 
     return null;
@@ -159,13 +191,23 @@ export async function getProducts(
     const q = query(productsRef, ...constraints);
     const querySnapshot = await getDocs(q);
 
-    const products: Product[] = [];
-    querySnapshot.forEach((doc) => {
-      products.push({
-        id: doc.id,
-        ...doc.data(),
-      } as Product);
-    });
+    const rawProducts: Product[] = querySnapshot.docs.map(
+      (docSnap) =>
+        ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }) as Product
+    );
+
+    const products: Product[] = await Promise.all(
+      rawProducts.map(async (product) => {
+        const { normalized, updates } = normalizeProductPricing(product);
+
+        await applyPricingUpdates(product.id, updates);
+
+        return normalized;
+      })
+    );
 
     // Apply client-side filters (Firestore doesn't support range queries with other filters)
     let filteredProducts = products;
@@ -208,7 +250,10 @@ export async function updateProduct(
     const productRef = doc(db, 'products', productId);
 
     // Auto-update stock status based on quantity
-    const updateData: any = {
+    const updateData: Partial<ProductFormData> & {
+      updatedAt: ReturnType<typeof serverTimestamp>;
+      stockStatus?: 'active' | 'out-of-stock';
+    } = {
       ...updates,
       updatedAt: serverTimestamp(),
     };
@@ -365,13 +410,17 @@ export async function getOrder(orderId: string): Promise<Order | null> {
 /**
  * Get customer orders
  */
-export async function getCustomerOrders(customerId: string): Promise<Order[]> {
+export async function getCustomerOrders(
+  customerId: string,
+  limitCount: number = 20
+): Promise<Order[]> {
   try {
     const ordersRef = collection(db, 'orders');
     const q = query(
       ordersRef,
       where('customerId', '==', customerId),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
     );
 
     const querySnapshot = await getDocs(q);
@@ -400,7 +449,11 @@ export async function updateOrderStatus(
 ): Promise<void> {
   try {
     const orderRef = doc(db, 'orders', orderId);
-    const updateData: any = {
+    const updateData: {
+      orderStatus: OrderStatus;
+      updatedAt: ReturnType<typeof serverTimestamp>;
+      deliveredAt?: ReturnType<typeof serverTimestamp>;
+    } = {
       orderStatus: status,
       updatedAt: serverTimestamp(),
     };
@@ -427,7 +480,12 @@ export async function updatePaymentStatus(
 ): Promise<void> {
   try {
     const orderRef = doc(db, 'orders', orderId);
-    const updateData: any = {
+    const updateData: {
+      paymentStatus: PaymentStatus;
+      updatedAt: ReturnType<typeof serverTimestamp>;
+      paymentReference?: string;
+      orderStatus?: 'processing';
+    } = {
       paymentStatus,
       updatedAt: serverTimestamp(),
     };
@@ -495,7 +553,11 @@ export async function updateTrackingNumber(
 ): Promise<void> {
   try {
     const orderRef = doc(db, 'orders', orderId);
-    const updateData: any = {
+    const updateData: {
+      trackingNumber: string;
+      updatedAt: ReturnType<typeof serverTimestamp>;
+      estimatedDelivery?: Date;
+    } = {
       trackingNumber,
       updatedAt: serverTimestamp(),
     };
@@ -535,4 +597,150 @@ export async function getAllOrders(limitCount: number = 50): Promise<Order[]> {
     console.error('Error getting all orders:', error);
     throw new Error('Failed to fetch orders');
   }
+}
+
+export interface OrderAssignmentInput {
+  supplierId: string;
+  supplierName: string;
+  items: SupplierAssignmentItem[];
+  notes?: string;
+  autoAssigned?: boolean;
+}
+
+export async function assignOrderToSupplier(
+  orderId: string,
+  input: OrderAssignmentInput
+): Promise<void> {
+  const orderRef = doc(db, 'orders', orderId);
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(orderRef);
+
+    if (!snapshot.exists()) {
+      throw new Error('Order not found');
+    }
+
+    const order = snapshot.data() as Order;
+    const assignments = [...(order.supplierAssignments ?? [])] as SupplierAssignment[];
+    const now = Timestamp.now();
+
+    const existingIndex = assignments.findIndex(
+      (assignment) => assignment.supplierId === input.supplierId
+    );
+
+    if (existingIndex >= 0) {
+      const current = { ...assignments[existingIndex] };
+      current.items = input.items;
+      if (input.notes !== undefined) {
+        current.notes = input.notes;
+      }
+      current.autoAssigned = input.autoAssigned ?? current.autoAssigned ?? false;
+      if (current.status !== 'fulfilled') {
+        current.status = 'pending';
+      }
+      // Remove respondedAt by deleting the property
+      delete current.respondedAt;
+      current.assignedAt = now;
+      assignments[existingIndex] = current;
+    } else {
+      const newAssignment: SupplierAssignment = {
+        supplierId: input.supplierId,
+        supplierName: input.supplierName,
+        items: input.items,
+        status: 'pending',
+        autoAssigned: input.autoAssigned ?? false,
+        assignedAt: now,
+      };
+      // Only include notes if provided
+      if (input.notes !== undefined) {
+        newAssignment.notes = input.notes;
+      }
+      assignments.push(newAssignment);
+    }
+
+    const supplierIds = new Set(order.supplierIds ?? []);
+    supplierIds.add(input.supplierId);
+
+    transaction.update(orderRef, {
+      supplierAssignments: assignments,
+      supplierIds: Array.from(supplierIds),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+export async function updateSupplierAssignmentStatus(
+  orderId: string,
+  supplierId: string,
+  status: SupplierAssignmentStatus,
+  options: { notes?: string; respondedAt?: Date } = {}
+): Promise<void> {
+  const orderRef = doc(db, 'orders', orderId);
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(orderRef);
+    if (!snapshot.exists()) {
+      throw new Error('Order not found');
+    }
+
+    const order = snapshot.data() as Order;
+    const assignments = [...(order.supplierAssignments ?? [])] as SupplierAssignment[];
+    const index = assignments.findIndex((assignment) => assignment.supplierId === supplierId);
+
+    if (index === -1) {
+      throw new Error('Assignment not found for supplier');
+    }
+
+    const updated = { ...assignments[index] };
+    updated.status = status;
+
+    if (options.notes !== undefined) {
+      updated.notes = options.notes;
+    }
+
+    if (status !== 'pending') {
+      updated.respondedAt = options.respondedAt
+        ? Timestamp.fromDate(options.respondedAt)
+        : Timestamp.now();
+    } else if (options.respondedAt !== undefined) {
+      updated.respondedAt = options.respondedAt ? Timestamp.fromDate(options.respondedAt) : undefined;
+    }
+
+    assignments[index] = updated;
+
+    transaction.update(orderRef, {
+      supplierAssignments: assignments,
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+export async function removeSupplierAssignment(
+  orderId: string,
+  supplierId: string
+): Promise<void> {
+  const orderRef = doc(db, 'orders', orderId);
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(orderRef);
+    if (!snapshot.exists()) {
+      throw new Error('Order not found');
+    }
+
+    const order = snapshot.data() as Order;
+    const assignments = [...(order.supplierAssignments ?? [])] as SupplierAssignment[];
+    const filteredAssignments = assignments.filter(
+      (assignment) => assignment.supplierId !== supplierId
+    );
+
+    const remainingIds = Array.from(
+      new Set(filteredAssignments.map((assignment) => assignment.supplierId))
+    );
+
+    transaction.update(orderRef, {
+      supplierAssignments: filteredAssignments,
+      supplierIds: remainingIds,
+      updatedAt: serverTimestamp(),
+    });
+  });
 }

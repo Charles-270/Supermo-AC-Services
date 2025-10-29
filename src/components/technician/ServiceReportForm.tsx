@@ -39,7 +39,6 @@ export function ServiceReportForm({ booking, onComplete }: ServiceReportFormProp
   const [partsUsed, setPartsUsed] = useState<PartUsed[]>([]);
   const [beforePhotos, setBeforePhotos] = useState<string[]>(booking.beforePhotos || []);
   const [afterPhotos, setAfterPhotos] = useState<string[]>(booking.afterPhotos || []);
-  const [hasSignature, setHasSignature] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // New part form
@@ -90,7 +89,6 @@ export function ServiceReportForm({ booking, onComplete }: ServiceReportFormProp
 
     ctx.lineTo(x, y);
     ctx.stroke();
-    setHasSignature(true);
   };
 
   const stopDrawing = () => {
@@ -105,7 +103,6 @@ export function ServiceReportForm({ booking, onComplete }: ServiceReportFormProp
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setHasSignature(false);
   };
 
   const addPart = () => {

@@ -127,7 +127,7 @@ export interface PlatformSettings {
   payment: PaymentSettings;
   notifications: NotificationSettings;
   system: SystemSettings;
-  updatedAt?: any; // Firestore Timestamp
+  updatedAt?: Date | { toDate: () => Date }; // Firestore Timestamp
   updatedBy?: string; // Admin UID
 }
 

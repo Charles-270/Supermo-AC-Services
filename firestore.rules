@@ -42,6 +42,12 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true;
     }
 
+    function isSupplierDb() {
+      return isAuthenticated() &&
+             getUserRoleFromDb() == 'supplier' &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true;
+    }
+
     // Users collection
     match /users/{userId} {
       // Users can read their own profile
@@ -54,6 +60,9 @@ service cloud.firestore {
 
       // Users can update their own profile
       allow update: if isOwner(userId);
+
+      // Suppliers can read their own profile for dashboard stats
+      allow read: if (isSupplier() || isSupplierDb()) && userId == request.auth.uid;
 
       // Admins can read/update all profiles (try custom claims first, fallback to DB)
       allow read, update: if isAdmin() || isAdminDb();
@@ -74,6 +83,13 @@ service cloud.firestore {
                       resource.data.customerId == request.auth.uid &&
                       resource.data.status == 'pending';
 
+      // Customers can add ratings to their own completed bookings
+      allow update: if isAuthenticated() &&
+                      resource.data.customerId == request.auth.uid &&
+                      resource.data.status == 'completed' &&
+                      // Only allow updating rating fields
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerRating', 'customerReview', 'updatedAt']);
+
       // Technicians can read bookings assigned to them
       allow read: if isAuthenticated() &&
                     resource.data.technicianId == request.auth.uid;
@@ -92,11 +108,11 @@ service cloud.firestore {
       allow read: if true;
 
       // Only suppliers and admins can create products
-      allow create: if isSupplier() || isAdmin() || isAdminDb();
+      allow create: if isSupplier() || isSupplierDb() || isAdmin() || isAdminDb();
 
       // Suppliers, admins, and authenticated users (for stock updates during orders) can update
       // Stock updates are allowed for authenticated users during checkout
-      allow update: if isSupplier() || isAdmin() || isAdminDb() || isAuthenticated();
+      allow update: if isSupplier() || isSupplierDb() || isAdmin() || isAdminDb() || isAuthenticated();
 
       // Only admins can delete products
       allow delete: if isAdmin() || isAdminDb();
@@ -116,10 +132,27 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
                       resource.data.customerId == request.auth.uid;
 
-      // Suppliers can read orders for their products
-      allow read: if isSupplier();
+      // Suppliers can read and update orders for their products (for fulfillment)
+      allow read, update: if isSupplier() || isSupplierDb();
 
       // Admins have full access (try custom claims first for speed, fallback to DB)
+      allow read, write: if isAdmin() || isAdminDb();
+    }
+
+    // Supplier catalog collection (inventory owned by suppliers)
+    match /supplier_catalog/{itemId} {
+      // Suppliers can read ALL catalog items (needed for linking and viewing marketplace)
+      allow read: if isSupplier() || isSupplierDb();
+
+      // Suppliers can add new catalog items for themselves
+      allow create: if (isSupplier() || isSupplierDb()) &&
+                      request.resource.data.supplierId == request.auth.uid;
+
+      // Suppliers can update or remove only their own items
+      allow update, delete: if (isSupplier() || isSupplierDb()) &&
+                              resource.data.supplierId == request.auth.uid;
+
+      // Admins can manage all supplier catalog entries
       allow read, write: if isAdmin() || isAdminDb();
     }
 
@@ -187,6 +220,27 @@ service cloud.firestore {
       allow read: if true;
 
       // Only admins can update settings (try custom claims first for speed, fallback to DB)
+      allow write: if isAdmin() || isAdminDb();
+    }
+
+    // Revenue collection (for tracking platform earnings)
+    match /revenue/{revenueId} {
+      // Technicians can create revenue records when completing jobs
+      allow create: if isTechnician();
+
+      // Admins can read all revenue records
+      allow read: if isAdmin() || isAdminDb();
+
+      // Only admins can update/delete revenue records
+      allow update, delete: if isAdmin() || isAdminDb();
+    }
+
+    // Price change notifications collection
+    match /priceChangeNotifications/{notificationId} {
+      // Anyone authenticated can read notifications
+      allow read: if isAuthenticated();
+
+      // Only admins can create/update/delete notifications
       allow write: if isAdmin() || isAdminDb();
     }
 

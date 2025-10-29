@@ -3,7 +3,7 @@
  * Display customer's order history with filtering
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -56,13 +56,7 @@ export function OrderHistory() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  useEffect(() => {
-    if (user) {
-      fetchOrders();
-    }
-  }, [user]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
@@ -71,14 +65,20 @@ export function OrderHistory() {
       const fetchedOrders = await getCustomerOrders(user.uid);
       setOrders(fetchedOrders);
       setError(null);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error fetching orders:', err);
-      setError(err.message || 'Failed to load orders. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to load orders. Please try again.');
       setOrders([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchOrders();
+    }
+  }, [user, fetchOrders]);
 
   // Filter orders
   const filteredOrders = orders.filter((order) => {
@@ -92,9 +92,9 @@ export function OrderHistory() {
   });
 
   // Format date
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: { toDate: () => Date } | Date | string | undefined) => {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = typeof timestamp === 'object' && 'toDate' in timestamp ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',

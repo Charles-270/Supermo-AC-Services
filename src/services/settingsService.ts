@@ -10,7 +10,6 @@ import {
   updateDoc,
   serverTimestamp,
   onSnapshot,
-  DocumentReference,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { PlatformSettings } from '@/types/settings';

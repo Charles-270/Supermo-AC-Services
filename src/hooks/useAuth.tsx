@@ -3,6 +3,7 @@
  * Manages Firebase Authentication state and operations
  */
 
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
@@ -122,8 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (
     email: string,
     password: string,
-    displayName: string,
-    _role: UserRole
+    displayName: string
   ): Promise<User> => {
     try {
       setError(null);

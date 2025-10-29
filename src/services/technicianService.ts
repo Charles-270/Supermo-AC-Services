@@ -10,8 +10,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
-  limit,
   updateDoc,
   setDoc,
   serverTimestamp,
@@ -423,11 +421,11 @@ export async function createTeam(team: Omit<Team, 'id' | 'createdAt' | 'updatedA
     const teamsRef = collection(db, 'teams');
     const newTeamRef = doc(teamsRef);
 
-    const teamData: Team = {
+    const teamData = {
       ...team,
       id: newTeamRef.id,
-      createdAt: serverTimestamp() as any,
-      updatedAt: serverTimestamp() as any,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     };
 
     await setDoc(newTeamRef, teamData);
@@ -488,5 +486,79 @@ export async function getTeamById(teamId: string): Promise<Team | null> {
   } catch (error) {
     console.error('Error fetching team:', error);
     throw new Error('Failed to fetch team');
+  }
+}
+
+/**
+ * Increment technician's total jobs completed
+ * Called when a booking is marked as complete
+ */
+export async function incrementTechnicianJobsCompleted(technicianId: string): Promise<void> {
+  try {
+    const techRef = doc(db, 'users', technicianId);
+    const techSnap = await getDoc(techRef);
+
+    if (!techSnap.exists()) {
+      throw new Error('Technician not found');
+    }
+
+    const techData = techSnap.data() as UserProfile;
+    const metadata = (techData.metadata || {}) as Partial<TechnicianMetadata>;
+    const currentCompleted = metadata.totalJobsCompleted ?? 0;
+
+    await updateDoc(techRef, {
+      'metadata.totalJobsCompleted': currentCompleted + 1,
+      updatedAt: serverTimestamp(),
+    });
+
+    console.log('✅ Technician jobs completed updated:', technicianId, currentCompleted + 1);
+  } catch (error) {
+    console.error('Error incrementing technician jobs completed:', error);
+    throw new Error('Failed to update technician stats');
+  }
+}
+
+/**
+ * Update technician's average rating
+ * Called when a customer submits a rating
+ * Recalculates average from all completed bookings with ratings
+ */
+export async function updateTechnicianRating(technicianId: string): Promise<void> {
+  try {
+    // Get all completed bookings for this technician that have ratings
+    const bookingsRef = collection(db, 'bookings');
+    const q = query(
+      bookingsRef,
+      where('technicianId', '==', technicianId),
+      where('status', '==', 'completed')
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    // Calculate average rating from all rated completed bookings
+    let totalRating = 0;
+    let ratingCount = 0;
+
+    querySnapshot.forEach((doc) => {
+      const booking = doc.data();
+      if (booking.customerRating && typeof booking.customerRating === 'number') {
+        totalRating += booking.customerRating;
+        ratingCount++;
+      }
+    });
+
+    const averageRating = ratingCount > 0 ? totalRating / ratingCount : 0;
+
+    // Update technician profile with new average
+    const techRef = doc(db, 'users', technicianId);
+    await updateDoc(techRef, {
+      'metadata.averageRating': averageRating,
+      updatedAt: serverTimestamp(),
+    });
+
+    console.log('✅ Technician rating updated:', technicianId, averageRating.toFixed(1));
+  } catch (error) {
+    console.error('Error updating technician rating:', error);
+    throw new Error('Failed to update technician rating');
   }
 }

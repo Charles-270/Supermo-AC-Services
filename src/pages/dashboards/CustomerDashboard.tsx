@@ -1,465 +1,276 @@
 /**
- * Customer Dashboard
+ * Customer Dashboard - Redesigned
  * Book services, shop products, track orders
  */
 
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeBookings, useRealtimeBookingCounts } from '@/hooks/useRealtimeBookings';
-import { BookingForm } from '@/components/booking/BookingForm';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { RatingDialog } from '@/components/booking/RatingDialog';
+import { BookingDetailsDialog } from '@/components/booking/BookingDetailsDialog';
+import { CustomerSidebar } from '@/components/layout/CustomerSidebar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Snowflake, ShoppingCart, Calendar, Package, Clock, MapPin, Loader2, FileText, TrendingUp } from 'lucide-react';
-import type { Booking } from '@/types/booking';
+import { Calendar, MapPin, Loader2, Menu, Star, User } from 'lucide-react';
 import {
   SERVICE_TYPE_LABELS,
   BOOKING_STATUS_LABELS,
-  BOOKING_STATUS_VARIANTS,
   TIME_SLOT_LABELS
 } from '@/types/booking';
 import { formatCurrency } from '@/lib/utils';
-import { getCustomerOrders } from '@/services/productService';
-import type { Order, OrderStatus } from '@/types/product';
+import type { Booking } from '@/types/booking';
 
-// Status badge configurations
-const STATUS_CONFIG: Record<
-  OrderStatus,
-  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
-> = {
-  'pending-payment': { label: 'Pending Payment', variant: 'outline' },
-  'payment-confirmed': { label: 'Payment Confirmed', variant: 'secondary' },
-  'processing': { label: 'Processing', variant: 'default' },
-  'shipped': { label: 'Shipped', variant: 'default' },
-  'delivered': { label: 'Delivered', variant: 'secondary' },
-  'cancelled': { label: 'Cancelled', variant: 'destructive' },
-  'refunded': { label: 'Refunded', variant: 'destructive' },
-  'failed': { label: 'Failed', variant: 'destructive' },
+// Status badge color mapping
+const getStatusBadgeClass = (status: string) => {
+  switch (status) {
+    case 'confirmed':
+      return 'bg-blue-100 text-blue-700 border-blue-200';
+    case 'completed':
+      return 'bg-green-100 text-green-700 border-green-200';
+    case 'in-progress':
+      return 'bg-purple-100 text-purple-700 border-purple-200';
+    case 'pending':
+      return 'bg-amber-100 text-amber-700 border-amber-200';
+    case 'cancelled':
+      return 'bg-red-100 text-red-700 border-red-200';
+    default:
+      return 'bg-neutral-100 text-neutral-700 border-neutral-200';
+  }
 };
 
 export function CustomerDashboard() {
-  const navigate = useNavigate();
-  const { user, profile, signOut } = useAuth();
-  const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [ordersLoading, setOrdersLoading] = useState(true);
-  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const { user, profile } = useAuth();
+  const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
+  const [selectedBookingForRating, setSelectedBookingForRating] = useState<Booking | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedBookingForDetails, setSelectedBookingForDetails] = useState<Booking | null>(null);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   // Real-time booking updates
   const { bookings, loading, error } = useRealtimeBookings({
     customerId: user?.uid,
   });
 
-  // Real-time booking counts
-  const { counts } = useRealtimeBookingCounts(user?.uid, 'customer');
+  // Real-time booking counts (unused but kept for future use)
+  useRealtimeBookingCounts(user?.uid, 'customer');
 
-  // Fetch customer orders
-  useEffect(() => {
-    if (user) {
-      fetchOrders();
-    }
-  }, [user]);
-
-  const fetchOrders = async () => {
-    if (!user) return;
-
-    setOrdersLoading(true);
-    setOrdersError(null);
-    try {
-      const fetchedOrders = await getCustomerOrders(user.uid);
-      setOrders(fetchedOrders);
-      setOrdersError(null);
-    } catch (error: any) {
-      console.error('Error fetching orders:', error);
-      setOrdersError(error.message || 'Failed to load orders. Please try again.');
-      setOrders([]);
-    } finally {
-      setOrdersLoading(false);
-    }
+  const handleOpenRatingDialog = (booking: Booking) => {
+    setSelectedBookingForRating(booking);
+    setRatingDialogOpen(true);
   };
 
-  // Calculate order stats
-  const orderStats = {
-    total: orders.length,
-    pending: orders.filter(o => ['pending-payment', 'payment-confirmed', 'processing'].includes(o.orderStatus)).length,
-    shipped: orders.filter(o => o.orderStatus === 'shipped').length,
-    delivered: orders.filter(o => o.orderStatus === 'delivered').length,
-  };
-
-  const handleBookingSuccess = () => {
-    setBookingDialogOpen(false);
+  const handleRatingSuccess = () => {
     // No need to manually refresh - real-time listener will auto-update
+    setRatingDialogOpen(false);
+    setSelectedBookingForRating(null);
   };
 
-  const formatDate = (timestamp: any) => {
+  const handleOpenDetailsDialog = (booking: Booking) => {
+    setSelectedBookingForDetails(booking);
+    setDetailsDialogOpen(true);
+  };
+
+  const formatDate = (timestamp: { toDate: () => Date } | Date | string | undefined) => {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
+    const date = typeof timestamp === 'object' && 'toDate' in timestamp ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('en-US', {
+      day: '2-digit',
+      month: '2-digit',
       year: 'numeric',
     });
   };
 
+  const formatTimeSlot = (timeSlot: string) => {
+    return TIME_SLOT_LABELS[timeSlot as keyof typeof TIME_SLOT_LABELS] || timeSlot;
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-cool">
-      {/* Header */}
-      <header className="bg-white border-b border-neutral-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Snowflake className="h-8 w-8 text-primary-500" />
-              <div>
-                <h1 className="text-2xl font-bold text-neutral-900">Customer Portal</h1>
-                <p className="text-sm text-neutral-600">Welcome back, {profile?.displayName}!</p>
-              </div>
-            </div>
-            <Button variant="outline" onClick={signOut}>
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="relative min-h-screen bg-neutral-50">
+      {/* Sidebar */}
+      <CustomerSidebar className="hidden lg:flex" />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Book Service */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary-500" />
-                Book Service
-              </CardTitle>
-              <CardDescription>
-                Schedule AC maintenance, repair, or installation
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+      <div className="flex min-h-screen flex-col lg:ml-64">
+        {/* Header */}
+        <header className="sticky top-0 z-20 border-b border-neutral-200 bg-white">
+          <div className="px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-neutral-900">My Bookings</h1>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Welcome back, {profile?.displayName}
+                </p>
+              </div>
               <Button
-                className="w-full"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setBookingDialogOpen(true);
-                }}
+                variant="ghost"
+                size="icon"
+                className="lg:hidden"
+                onClick={() => setIsMobileNavOpen(true)}
+                aria-label="Open navigation"
               >
-                Book Now
+                <Menu className="h-5 w-5" />
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        </header>
 
-          {/* Shop Products */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5 text-accent-500" />
-                Shop Products
-              </CardTitle>
-              <CardDescription>
-                Browse AC units, spare parts, and accessories
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                variant="secondary"
-                className="w-full"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate('/products');
-                }}
-              >
-                Browse Catalog
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Track Orders */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-success" />
-                My Orders
-              </CardTitle>
-              <CardDescription>
-                Track your product orders and deliveries
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {ordersLoading ? (
-                <div className="flex items-center justify-center py-2">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary-500" />
+        {/* Content */}
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          {/* Bookings Section */}
+          <div className="rounded-lg border border-neutral-200 bg-white shadow-sm">
+            <div className="border-b border-neutral-200 p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-neutral-900">My Bookings</h2>
+                  <p className="mt-1 text-sm text-neutral-600">
+                    Your service appointments updated in real-time.
+                  </p>
                 </div>
-              ) : ordersError ? (
-                <div className="text-center py-2">
-                  <p className="text-sm text-error mb-2">{ordersError}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      fetchOrders();
-                    }}
-                  >
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-6">
+              {loading ? (
+                <div className="text-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-cyan-500 mx-auto mb-3" />
+                  <p className="text-neutral-500">Loading bookings...</p>
+                </div>
+              ) : error ? (
+                <div className="text-center py-12">
+                  <p className="text-red-600 mb-3">{error}</p>
+                  <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
                     Retry
                   </Button>
                 </div>
+              ) : bookings.length === 0 ? (
+                <div className="text-center py-12">
+                  <Calendar className="h-12 w-12 text-neutral-300 mx-auto mb-3" />
+                  <p className="text-neutral-500">
+                    No bookings yet. Use the "Book Services" menu to schedule your first service!
+                  </p>
+                </div>
               ) : (
-                <>
-                  <div className="flex justify-between text-sm mb-3">
-                    <span className="text-neutral-600">Total Orders</span>
-                    <span className="font-semibold">{orderStats.total}</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate('/orders');
-                    }}
-                  >
-                    View All Orders
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* My Bookings */}
-        <Card className="mt-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  My Bookings
-                  <span className="flex h-2 w-2 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-success-500" title="Live updates enabled"></span>
-                  </span>
-                </CardTitle>
-                <CardDescription>Your service appointments update in real-time</CardDescription>
-              </div>
-              {!loading && (
-                <div className="flex gap-2 text-sm">
-                  {counts.pending > 0 && (
-                    <Badge variant="outline" className="border-amber-500 text-amber-700">
-                      {counts.pending} Pending
-                    </Badge>
-                  )}
-                  {counts.confirmed > 0 && (
-                    <Badge variant="outline" className="border-blue-500 text-blue-700">
-                      {counts.confirmed} Confirmed
-                    </Badge>
-                  )}
-                  {counts['in-progress'] > 0 && (
-                    <Badge variant="outline" className="border-primary-500 text-primary-700">
-                      {counts['in-progress']} In Progress
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto mb-2" />
-                <p className="text-neutral-500">Loading bookings...</p>
-              </div>
-            ) : error ? (
-              <div className="text-center py-8">
-                <p className="text-error mb-2">{error}</p>
-                <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-                  Retry
-                </Button>
-              </div>
-            ) : bookings.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-neutral-500 mb-4">
-                  No bookings yet. Book your first service!
-                </p>
-                <Button onClick={() => setBookingDialogOpen(true)}>
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Book Service
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {bookings.map((booking) => (
-                  <div
-                    key={booking.id}
-                    className="flex flex-col md:flex-row md:items-center justify-between p-4 border border-neutral-200 rounded-lg hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold">{SERVICE_TYPE_LABELS[booking.serviceType]}</h3>
-                        <Badge variant={BOOKING_STATUS_VARIANTS[booking.status]}>
-                          {BOOKING_STATUS_LABELS[booking.status]}
-                        </Badge>
-                      </div>
-                      <div className="flex flex-col gap-2 text-sm text-neutral-600">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {booking.preferredDate?.toDate?.()?.toLocaleDateString() || 'Date not set'} - {TIME_SLOT_LABELS[booking.preferredTimeSlot]}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {booking.address}, {booking.city}
-                        </span>
-                        {booking.technicianName && (
-                          <span className="text-primary-600">
-                            Assigned to: {booking.technicianName}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-4 md:mt-0 md:ml-4 flex flex-col items-end gap-2">
-                      {booking.estimatedCost && (
-                        <p className="text-lg font-semibold text-primary-600">
-                          {formatCurrency(booking.estimatedCost)}
-                        </p>
-                      )}
-                      <Button size="sm" variant="outline">
-                        View Details
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Orders */}
-        <Card className="mt-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-primary-500" />
-                  Recent Orders
-                </CardTitle>
-                <CardDescription>Your latest product purchases</CardDescription>
-              </div>
-              {!ordersLoading && orders.length > 0 && (
-                <div className="flex gap-2 text-sm">
-                  {orderStats.pending > 0 && (
-                    <Badge variant="outline" className="border-amber-500 text-amber-700">
-                      {orderStats.pending} Active
-                    </Badge>
-                  )}
-                  {orderStats.delivered > 0 && (
-                    <Badge variant="outline" className="border-green-500 text-green-700">
-                      {orderStats.delivered} Delivered
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {ordersLoading ? (
-              <div className="text-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto mb-2" />
-                <p className="text-neutral-500">Loading orders...</p>
-              </div>
-            ) : ordersError ? (
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 text-error-300 mx-auto mb-3" />
-                <p className="text-error mb-2">{ordersError}</p>
-                <p className="text-sm text-neutral-500 mb-4">
-                  Unable to load your orders. This may be due to a connection issue.
-                </p>
-                <Button variant="outline" onClick={() => fetchOrders()}>
-                  <Loader2 className="h-4 w-4 mr-2" />
-                  Retry Loading Orders
-                </Button>
-              </div>
-            ) : orders.length === 0 ? (
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 text-neutral-300 mx-auto mb-3" />
-                <p className="text-neutral-500 mb-4">
-                  No orders yet. Start shopping for AC units and parts!
-                </p>
-                <Button onClick={() => navigate('/products')}>
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Browse Products
-                </Button>
-              </div>
-            ) : (
-              <>
                 <div className="space-y-4">
-                  {orders.slice(0, 3).map((order) => {
-                    const config = STATUS_CONFIG[order.orderStatus];
-                    return (
-                      <div
-                        key={order.id}
-                        className="flex flex-col md:flex-row md:items-center justify-between p-4 border border-neutral-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => navigate(`/orders/${order.id}`)}
-                      >
+                  {bookings.map((booking) => (
+                    <div
+                      key={booking.id}
+                      className="rounded-lg border border-neutral-200 bg-white p-4 transition-shadow hover:shadow-md sm:p-5"
+                    >
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold">{order.orderNumber}</h3>
-                            <Badge variant={config.variant}>{config.label}</Badge>
+                          <div className="mb-3 flex flex-wrap items-center gap-2 sm:gap-3">
+                            <h3 className="text-base font-semibold text-neutral-900">
+                              {SERVICE_TYPE_LABELS[booking.serviceType]}
+                            </h3>
+                            <Badge className={`${getStatusBadgeClass(booking.status)} border px-2 py-0.5 text-xs font-medium`}>
+                              {BOOKING_STATUS_LABELS[booking.status]}
+                            </Badge>
+                            {booking.status === 'completed' && booking.customerRating && (
+                              <div className="flex items-center gap-1">
+                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                <span className="text-sm font-medium text-yellow-600">
+                                  {booking.customerRating.toFixed(1)}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                          <div className="flex flex-col gap-1 text-sm text-neutral-600">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              {formatDate(order.createdAt)}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Package className="h-4 w-4" />
-                              {order.items.length} {order.items.length === 1 ? 'item' : 'items'}
-                            </span>
+
+                          <div className="space-y-2 text-sm text-neutral-600">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-neutral-400" />
+                              <span>
+                                {formatDate(booking.preferredDate)} - {formatTimeSlot(booking.preferredTimeSlot)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-neutral-400" />
+                              <span>{booking.address}, {booking.city}</span>
+                            </div>
+                            {booking.technicianName && (
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 text-neutral-400" />
+                                <span>Assigned to: {booking.technicianName}</span>
+                              </div>
+                            )}
+                            {(booking.finalCost || booking.agreedPrice) && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-cyan-600">
+                                  {formatCurrency(booking.finalCost || booking.agreedPrice || 0)}
+                                  {booking.finalCost ? ' (Final)' : ' (Agreed)'}
+                                </span>
+                              </div>
+                            )}
+                            {/* Debug pricing - remove in production */}
+
                           </div>
                         </div>
-                        <div className="mt-4 md:mt-0 md:ml-4 flex flex-col items-end gap-2">
-                          <p className="text-lg font-semibold text-primary-600">
-                            {formatCurrency(order.totalAmount)}
-                          </p>
+
+                        <div className="flex w-full flex-col gap-2 md:ml-4 md:w-auto md:items-end">
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/orders/${order.id}`);
-                            }}
+                            className="w-full md:w-auto"
+                            onClick={() => handleOpenDetailsDialog(booking)}
                           >
                             View Details
                           </Button>
+                          {booking.status === 'completed' && !booking.customerRating && (
+                            <Button
+                              size="sm"
+                              className="w-full bg-cyan-500 text-white hover:bg-cyan-600 md:w-auto"
+                              onClick={() => handleOpenRatingDialog(booking)}
+                            >
+                              <Star className="h-4 w-4 mr-1" />
+                              Rate Service
+                            </Button>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
-                {orders.length > 3 && (
-                  <div className="mt-4 text-center">
-                    <Button
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate('/orders');
-                      }}
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      View All {orders.length} Orders
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </main>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
 
-      {/* Booking Form Dialog */}
-      <BookingForm
-        open={bookingDialogOpen}
-        onOpenChange={setBookingDialogOpen}
-        onSuccess={handleBookingSuccess}
-      />
+      {/* Mobile Navigation Overlay */}
+      {isMobileNavOpen && (
+        <div className="fixed inset-0 z-30 flex lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setIsMobileNavOpen(false)}
+            aria-hidden="true"
+          />
+          <CustomerSidebar
+            variant="mobile"
+            className="relative z-40 h-full w-72 max-w-[80%]"
+            onClose={() => setIsMobileNavOpen(false)}
+            onNavigate={() => setIsMobileNavOpen(false)}
+          />
+        </div>
+      )}
+
+      {/* Rating Dialog */}
+      {selectedBookingForRating && (
+        <RatingDialog
+          open={ratingDialogOpen}
+          onOpenChange={setRatingDialogOpen}
+          bookingId={selectedBookingForRating.id}
+          technicianName={selectedBookingForRating.technicianName || 'Technician'}
+          onSuccess={handleRatingSuccess}
+        />
+      )}
+
+      {/* Booking Details Dialog */}
+      {selectedBookingForDetails && (
+        <BookingDetailsDialog
+          open={detailsDialogOpen}
+          onOpenChange={setDetailsDialogOpen}
+          booking={selectedBookingForDetails}
+        />
+      )}
     </div>
   );
 }

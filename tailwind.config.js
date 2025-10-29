@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -7,39 +8,42 @@ export default {
   theme: {
     extend: {
       colors: {
-        // HVAC Brand Colors - Cool Blues (Cooling, Trust, Professionalism)
+        // Google Stitch Design Colors
         primary: {
-          DEFAULT: '#0EA5E9', // Sky Blue - main brand color
-          50: '#F0F9FF',
-          100: '#E0F2FE',
-          200: '#BAE6FD',
-          300: '#7DD3FC',
-          400: '#38BDF8',
-          500: '#0EA5E9', // DEFAULT
-          600: '#0284C7', // Dark variant
-          700: '#0369A1',
-          800: '#075985',
-          900: '#0C4A6E',
-          950: '#082F49',
+          DEFAULT: '#00BCD4',
+          50: '#E0F7FA',
+          100: '#B2EBF2',
+          200: '#80DEEA',
+          300: '#4DD0E1',
+          400: '#26C6DA',
+          500: '#00BCD4', // DEFAULT
+          600: '#00ACC1',
+          700: '#0097A7',
+          800: '#00838F',
+          900: '#006064',
         },
-        accent: {
-          DEFAULT: '#06B6D4', // Cyan - freshness, air quality
-          50: '#ECFEFF',
-          100: '#CFFAFE',
-          200: '#A5F3FC',
-          300: '#67E8F9',
-          400: '#22D3EE',
-          500: '#06B6D4', // DEFAULT
-          600: '#0891B2',
-          700: '#0E7490',
-          800: '#155E75',
-          900: '#164E63',
-        },
+        
+        // Background Colors
+        'background-light': '#F7FAFC',
+        'background-dark': '#1A202C',
+        
+        // Text Colors
+        'text-light': '#2D3748',
+        'text-dark': '#E2E8F0',
+        
+        // Card Colors
+        'card-light': '#FFFFFF',
+        'card-dark': '#2D3748',
+        
+        // Border Colors
+        'border-light': '#E2E8F0',
+        'border-dark': '#4A5568',
+        
         // Status Colors
-        success: '#10B981', // Emerald - successful service
-        warning: '#F59E0B', // Amber - maintenance reminder
-        error: '#EF4444',   // Red - urgent repair
-        info: '#3B82F6',    // Blue - information
+        success: '#10B981',
+        warning: '#F59E0B',
+        error: '#EF4444',
+        info: '#3B82F6',
 
         // Neutral Colors (Professional, Clean)
         neutral: {
@@ -48,7 +52,7 @@ export default {
           200: '#E2E8F0',
           300: '#CBD5E1',
           400: '#94A3B8',
-          500: '#64748B', // DEFAULT
+          500: '#64748B',
           600: '#475569',
           700: '#334155',
           800: '#1E293B',
@@ -57,7 +61,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['Poppins', 'sans-serif'],
+        sans: ['Poppins', 'system-ui', '-apple-system', 'sans-serif'],
       },
       fontSize: {
         'xs': ['0.75rem', { lineHeight: '1rem' }],
@@ -69,11 +74,14 @@ export default {
         '3xl': ['1.875rem', { lineHeight: '2.25rem' }],
         '4xl': ['2.25rem', { lineHeight: '2.5rem' }],
         '5xl': ['3rem', { lineHeight: '1' }],
+        '6xl': ['3.75rem', { lineHeight: '1' }],
       },
       borderRadius: {
-        'lg': '0.5rem',
-        'md': '0.375rem',
+        DEFAULT: '0.5rem',
+        'lg': '0.75rem',
+        'md': '0.5rem',
         'sm': '0.25rem',
+        'full': '9999px',
       },
       boxShadow: {
         'sm': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
@@ -81,6 +89,22 @@ export default {
         'md': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
         'lg': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
         'xl': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+        '2xl': '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+      },
+      animation: {
+        'fly-in': 'fly-in 0.8s ease-out forwards',
+      },
+      keyframes: {
+        'fly-in': {
+          'from': {
+            opacity: '0',
+            transform: 'translateY(50px)',
+          },
+          'to': {
+            opacity: '1',
+            transform: 'translateY(0)',
+          },
+        },
       },
     },
   },

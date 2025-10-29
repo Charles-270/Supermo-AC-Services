@@ -3,11 +3,11 @@
  * Confirmation page after successful payment
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Package, Home, FileText } from 'lucide-react';
+import { CheckCircle2, Package, Home } from 'lucide-react';
 import { getOrder } from '@/services/productService';
 import { updatePaymentStatus } from '@/services/productService';
 import { formatCurrency } from '@/lib/utils';
@@ -21,13 +21,7 @@ export function OrderSuccess() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (orderId && paymentReference) {
-      fetchOrderAndUpdatePayment();
-    }
-  }, [orderId, paymentReference]);
-
-  const fetchOrderAndUpdatePayment = async () => {
+  const fetchOrderAndUpdatePayment = useCallback(async () => {
     if (!orderId || !paymentReference) return;
 
     try {
@@ -42,7 +36,13 @@ export function OrderSuccess() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId, paymentReference]);
+
+  useEffect(() => {
+    if (orderId && paymentReference) {
+      fetchOrderAndUpdatePayment();
+    }
+  }, [orderId, paymentReference, fetchOrderAndUpdatePayment]);
 
   if (loading) {
     return (

@@ -8,7 +8,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -20,6 +19,7 @@ export interface RevenueDataPoint {
   date: string;
   revenue: number;
   orders: number;
+  [key: string]: string | number; // Index signature for generic functions
 }
 
 /**
@@ -29,6 +29,7 @@ export interface UserGrowthDataPoint {
   date: string;
   totalUsers: number;
   newUsers: number;
+  [key: string]: string | number; // Index signature for generic functions
 }
 
 /**
@@ -39,6 +40,7 @@ export interface BookingTrendDataPoint {
   bookings: number;
   completed: number;
   pending: number;
+  [key: string]: string | number; // Index signature for generic functions
 }
 
 /**
@@ -62,26 +64,32 @@ export interface ServiceTypeAnalytics {
 
 /**
  * Get revenue analytics for the last N days
+ * Uses client-side filtering to avoid compound index requirement
  */
 export async function getRevenueAnalytics(days: number = 30): Promise<RevenueDataPoint[]> {
   try {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
+    const startTimestamp = Timestamp.fromDate(startDate);
 
+    // Simple query with single where clause - no compound index needed
     const ordersRef = collection(db, 'orders');
     const q = query(
       ordersRef,
-      where('createdAt', '>=', Timestamp.fromDate(startDate)),
-      where('paymentStatus', '==', 'paid')
+      where('createdAt', '>=', startTimestamp)
     );
 
     const querySnapshot = await getDocs(q);
 
-    // Group by date
+    // Group by date with client-side filtering for paymentStatus
     const revenueByDate: Map<string, { revenue: number; count: number }> = new Map();
 
     querySnapshot.forEach((doc) => {
       const order = doc.data();
+
+      // Client-side filter: only include paid orders
+      if (order.paymentStatus !== 'paid') return;
+
       const date = order.createdAt?.toDate?.();
       if (date) {
         const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -110,12 +118,14 @@ export async function getRevenueAnalytics(days: number = 30): Promise<RevenueDat
     return dataPoints;
   } catch (error) {
     console.error('Error fetching revenue analytics:', error);
-    throw new Error('Failed to fetch revenue analytics');
+    // Return empty data instead of throwing - more graceful degradation
+    return [];
   }
 }
 
 /**
  * Get user growth analytics
+ * Fetches all users and calculates growth over time
  */
 export async function getUserGrowthAnalytics(days: number = 30): Promise<UserGrowthDataPoint[]> {
   try {
@@ -154,12 +164,14 @@ export async function getUserGrowthAnalytics(days: number = 30): Promise<UserGro
     return dataPoints;
   } catch (error) {
     console.error('Error fetching user growth analytics:', error);
-    throw new Error('Failed to fetch user growth analytics');
+    // Return empty data instead of throwing
+    return [];
   }
 }
 
 /**
  * Get booking trends
+ * Simple query with date filter, no compound index needed
  */
 export async function getBookingTrends(days: number = 30): Promise<BookingTrendDataPoint[]> {
   try {
@@ -206,29 +218,30 @@ export async function getBookingTrends(days: number = 30): Promise<BookingTrendD
     return dataPoints;
   } catch (error) {
     console.error('Error fetching booking trends:', error);
-    throw new Error('Failed to fetch booking trends');
+    // Return empty data instead of throwing
+    return [];
   }
 }
 
 /**
  * Get top selling products
+ * Fetches all orders and filters for paid ones client-side
  */
 export async function getTopProducts(limit: number = 10): Promise<TopProduct[]> {
   try {
     const ordersRef = collection(db, 'orders');
-    const q = query(
-      ordersRef,
-      where('paymentStatus', '==', 'paid')
-    );
-
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await getDocs(ordersRef);
 
     const productSales: Map<string, { name: string; quantity: number; revenue: number }> = new Map();
 
     querySnapshot.forEach((doc) => {
       const order = doc.data();
+
+      // Client-side filter: only include paid orders
+      if (order.paymentStatus !== 'paid') return;
+
       if (order.items && Array.isArray(order.items)) {
-        order.items.forEach((item: any) => {
+        order.items.forEach((item: { productId: string; productName?: string; quantity?: number; subtotal?: number }) => {
           const current = productSales.get(item.productId) || {
             name: item.productName || 'Unknown Product',
             quantity: 0,
@@ -257,12 +270,14 @@ export async function getTopProducts(limit: number = 10): Promise<TopProduct[]> 
     return topProducts;
   } catch (error) {
     console.error('Error fetching top products:', error);
-    throw new Error('Failed to fetch top products');
+    // Return empty data instead of throwing
+    return [];
   }
 }
 
 /**
  * Get service type analytics
+ * Aggregates bookings by service type
  */
 export async function getServiceTypeAnalytics(): Promise<ServiceTypeAnalytics[]> {
   try {
@@ -292,7 +307,8 @@ export async function getServiceTypeAnalytics(): Promise<ServiceTypeAnalytics[]>
     return analytics;
   } catch (error) {
     console.error('Error fetching service type analytics:', error);
-    throw new Error('Failed to fetch service type analytics');
+    // Return empty data instead of throwing
+    return [];
   }
 }
 
@@ -317,22 +333,45 @@ export async function getPlatformStats(): Promise<PlatformStats> {
       getDocs(collection(db, 'users')),
     ]);
 
-    let totalRevenue = 0;
+    // Calculate E-Commerce Revenue (from orders)
+    let ecommerceRevenue = 0;
     let paidOrders = 0;
 
     ordersSnapshot.forEach((doc) => {
       const order = doc.data();
       if (order.paymentStatus === 'paid') {
-        totalRevenue += order.totalAmount || 0;
+        ecommerceRevenue += order.totalAmount || 0;
         paidOrders += 1;
       }
     });
 
+    // Calculate Booking Revenue (from completed technician services)
+    let bookingRevenue = 0;
+    let completedBookings = 0;
+
+    bookingsSnapshot.forEach((doc) => {
+      const booking = doc.data();
+      if (booking.status === 'completed') {
+        // Use finalCost if available, otherwise use agreedPrice or estimatedCost
+        const revenue = booking.finalCost || booking.agreedPrice || booking.estimatedCost || 0;
+        bookingRevenue += revenue;
+        completedBookings += 1;
+      }
+    });
+
+    // Combine both revenue sources
+    const totalRevenue = ecommerceRevenue + bookingRevenue;
+
     const totalOrders = ordersSnapshot.size;
     const totalBookings = bookingsSnapshot.size;
     const totalUsers = usersSnapshot.size;
-    const averageOrderValue = paidOrders > 0 ? totalRevenue / paidOrders : 0;
-    const conversionRate = totalUsers > 0 ? (paidOrders / totalUsers) * 100 : 0;
+    
+    // Average order value based on paid orders only
+    const averageOrderValue = paidOrders > 0 ? ecommerceRevenue / paidOrders : 0;
+    
+    // Conversion rate based on total transactions (orders + bookings) vs users
+    const totalTransactions = paidOrders + completedBookings;
+    const conversionRate = totalUsers > 0 ? (totalTransactions / totalUsers) * 100 : 0;
 
     return {
       totalRevenue,
@@ -344,6 +383,14 @@ export async function getPlatformStats(): Promise<PlatformStats> {
     };
   } catch (error) {
     console.error('Error fetching platform stats:', error);
-    throw new Error('Failed to fetch platform stats');
+    // Return zero stats instead of throwing
+    return {
+      totalRevenue: 0,
+      totalOrders: 0,
+      totalBookings: 0,
+      totalUsers: 0,
+      averageOrderValue: 0,
+      conversionRate: 0,
+    };
   }
 }

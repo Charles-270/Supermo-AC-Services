@@ -102,9 +102,9 @@ export function AdminApprovals() {
     }
   };
 
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: { toDate: () => Date } | Date | string | undefined) => {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = typeof timestamp === 'object' && 'toDate' in timestamp ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',

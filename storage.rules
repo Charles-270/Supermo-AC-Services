@@ -63,6 +63,32 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
+    // Job photos (before/after photos for service reports)
+    match /jobs/{bookingId}/photos/{photoName} {
+      // Authenticated users can read job photos
+      // (customers can see their booking photos, technicians can see their job photos)
+      allow read: if isAuthenticated();
+
+      // Technicians can upload photos for jobs
+      // Admins can also upload photos
+      allow write: if isAuthenticated() && isValidImage();
+
+      // Technicians and admins can delete photos
+      allow delete: if isAuthenticated();
+    }
+
+    // Supplier catalog request images
+    match /supplier_catalog_requests/{supplierId}/{imageName} {
+      // Authenticated users can read
+      allow read: if isAuthenticated();
+
+      // Suppliers can upload images for their catalog requests
+      allow write: if isAuthenticated() && isValidImage();
+
+      // Suppliers and admins can delete
+      allow delete: if isAuthenticated();
+    }
+
     // Default deny all other paths
     match /{allPaths=**} {
       allow read, write: if false;

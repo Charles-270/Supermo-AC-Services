@@ -3,8 +3,8 @@
  * Detailed view of a single order with tracking
  */
 
-import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +32,6 @@ import {
   Loader2,
   MapPin,
   CreditCard,
-  Calendar,
   Phone,
   Mail,
   FileText,
@@ -57,7 +56,7 @@ import { toast } from '@/components/ui/use-toast';
 // Status configurations
 const STATUS_CONFIG: Record<
   OrderStatus,
-  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: any }
+  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ComponentType<{ className?: string }> }
 > = {
   'pending-payment': { label: 'Pending Payment', variant: 'outline', icon: Clock },
   'payment-confirmed': { label: 'Payment Confirmed', variant: 'secondary', icon: CheckCircle2 },
@@ -80,29 +79,23 @@ const TIMELINE_STEPS: { status: OrderStatus; label: string }[] = [
 
 export function OrderDetails() {
   const { orderId } = useParams<{ orderId: string }>();
-  const navigate = useNavigate();
   const { user, profile } = useAuth();
+
+  // Determine the correct back path based on user role
+  const backPath = profile?.role === 'admin' ? '/admin/manage-orders' : '/orders';
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [existingReview, setExistingReview] = useState<Review | null>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
-  const [returnRequest, setReturnRequest] = useState<any>(null);
+  const [returnRequest, setReturnRequest] = useState<{ status: string; reason: string } | null>(null);
   const [showReturnDialog, setShowReturnDialog] = useState(false);
   const [returnReason, setReturnReason] = useState('');
   const [returnDescription, setReturnDescription] = useState('');
   const [submittingReturn, setSubmittingReturn] = useState(false);
 
-  useEffect(() => {
-    if (orderId) {
-      fetchOrder();
-      checkExistingReview();
-      checkReturnRequest();
-    }
-  }, [orderId]);
-
-  const checkExistingReview = async () => {
+  const checkExistingReview = useCallback(async () => {
     if (!orderId) return;
     try {
       const review = await getReviewByOrderId(orderId);
@@ -110,9 +103,9 @@ export function OrderDetails() {
     } catch (error) {
       console.error('Error checking review:', error);
     }
-  };
+  }, [orderId]);
 
-  const checkReturnRequest = async () => {
+  const checkReturnRequest = useCallback(async () => {
     if (!orderId) return;
     try {
       const request = await getReturnByOrderId(orderId);
@@ -120,7 +113,29 @@ export function OrderDetails() {
     } catch (error) {
       console.error('Error checking return request:', error);
     }
-  };
+  }, [orderId]);
+
+  const fetchOrder = useCallback(async () => {
+    if (!orderId) return;
+
+    setLoading(true);
+    try {
+      const fetchedOrder = await getOrder(orderId);
+      setOrder(fetchedOrder);
+    } catch (error) {
+      console.error('Error fetching order:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    if (orderId) {
+      fetchOrder();
+      checkExistingReview();
+      checkReturnRequest();
+    }
+  }, [orderId, fetchOrder, checkExistingReview, checkReturnRequest]);
 
   const handleSubmitReturn = async () => {
     if (!order || !user || !profile) return;
@@ -166,23 +181,9 @@ export function OrderDetails() {
     }
   };
 
-  const fetchOrder = async () => {
-    if (!orderId) return;
-
-    setLoading(true);
-    try {
-      const fetchedOrder = await getOrder(orderId);
-      setOrder(fetchedOrder);
-    } catch (error) {
-      console.error('Error fetching order:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: { toDate: () => Date } | Date | string | undefined) => {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = typeof timestamp === 'object' && 'toDate' in timestamp ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
@@ -286,7 +287,7 @@ export function OrderDetails() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link to="/orders">
+              <Link to={backPath}>
                 <Button variant="ghost" size="icon">
                   <ArrowLeft className="h-5 w-5" />
                 </Button>

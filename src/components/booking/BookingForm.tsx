@@ -3,7 +3,7 @@
  * Service selection → Details → Schedule → Confirmation
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { createBooking } from '@/services/bookingService';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -34,13 +34,13 @@ import type {
 } from '@/types/booking';
 import {
   SERVICE_TYPE_LABELS,
-  SERVICE_TYPE_DESCRIPTIONS,
-  SERVICE_BASE_PRICING,
   TIME_SLOT_LABELS,
   GHANA_CITIES,
 } from '@/types/booking';
 import { Loader2, CheckCircle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { ServiceSelector } from './ServiceSelector';
+import { getCurrentPricing, type ServicePricing } from '@/services/pricingService';
 
 interface BookingFormProps {
   open: boolean;
@@ -54,9 +54,10 @@ export function BookingForm({ open, onOpenChange, onSuccess }: BookingFormProps)
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pricing, setPricing] = useState<ServicePricing | null>(null);
 
   // Form state
-  const [serviceType, setServiceType] = useState<ServiceType>('maintenance');
+  const [serviceType, setServiceType] = useState<ServiceType | null>(null);
   const [serviceDetails, setServiceDetails] = useState<ServiceDetails>({});
   const [preferredDate, setPreferredDate] = useState('');
   const [preferredTimeSlot, setPreferredTimeSlot] = useState<'morning' | 'afternoon' | 'evening'>('morning');
@@ -66,8 +67,21 @@ export function BookingForm({ open, onOpenChange, onSuccess }: BookingFormProps)
   const [locationNotes, setLocationNotes] = useState('');
   const [customerPhone, setCustomerPhone] = useState(profile?.phoneNumber || '');
 
+  // Load pricing on mount
+  useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        const currentPricing = await getCurrentPricing();
+        setPricing(currentPricing);
+      } catch (err) {
+        console.error('Error loading pricing:', err);
+      }
+    };
+    void loadPricing();
+  }, []);
+
   const handleSubmit = async () => {
-    if (!user || !profile) return;
+    if (!user || !profile || !serviceType) return;
 
     setError(null);
     setLoading(true);
@@ -75,6 +89,7 @@ export function BookingForm({ open, onOpenChange, onSuccess }: BookingFormProps)
     try {
       const formData: BookingFormData = {
         serviceType,
+        servicePackage: 'basic', // Deprecated but required by type - will be removed in backend migration
         serviceDetails,
         preferredDate: new Date(preferredDate),
         preferredTimeSlot,
@@ -105,7 +120,7 @@ export function BookingForm({ open, onOpenChange, onSuccess }: BookingFormProps)
 
   const resetForm = () => {
     setStep(1);
-    setServiceType('maintenance');
+    setServiceType(null);
     setServiceDetails({});
     setPreferredDate('');
     setAlternateDate('');
@@ -121,8 +136,8 @@ export function BookingForm({ open, onOpenChange, onSuccess }: BookingFormProps)
         <DialogHeader>
           <DialogTitle>Book a Service</DialogTitle>
           <DialogDescription>
-            {step === 1 && 'Select the type of service you need'}
-            {step === 2 && 'Provide service details'}
+            {step === 1 && 'Choose the service you need'}
+            {step === 2 && 'Provide service details (optional)'}
             {step === 3 && 'Choose your preferred date and time'}
             {step === 4 && 'Review and confirm your booking'}
           </DialogDescription>
@@ -138,37 +153,18 @@ export function BookingForm({ open, onOpenChange, onSuccess }: BookingFormProps)
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Step 1: Service Selection */}
+            {/* Step 1: Service Type Selection */}
             {step === 1 && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {(Object.keys(SERVICE_TYPE_LABELS) as ServiceType[]).map((type) => (
-                    <Card
-                      key={type}
-                      className={`cursor-pointer transition-all ${
-                        serviceType === type ? 'ring-2 ring-primary-500' : 'hover:shadow-md'
-                      }`}
-                      onClick={() => setServiceType(type)}
-                    >
-                      <CardHeader>
-                        <CardTitle className="text-base">{SERVICE_TYPE_LABELS[type]}</CardTitle>
-                        <CardDescription className="text-xs">
-                          {SERVICE_TYPE_DESCRIPTIONS[type]}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm font-semibold text-primary-600">
-                          From {formatCurrency(SERVICE_BASE_PRICING[type])}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                <ServiceSelector
+                  selectedService={serviceType}
+                  onSelectService={setServiceType}
+                />
               </div>
             )}
 
             {/* Step 2: Service Details */}
-            {step === 2 && (
+            {step === 2 && serviceType && (
               <div className="space-y-4">
                 {serviceType === 'installation' && (
                   <>
@@ -302,7 +298,7 @@ export function BookingForm({ open, onOpenChange, onSuccess }: BookingFormProps)
 
                 <div className="space-y-2">
                   <Label htmlFor="time-slot">Preferred Time Slot *</Label>
-                  <Select value={preferredTimeSlot} onValueChange={(v: any) => setPreferredTimeSlot(v)}>
+                  <Select value={preferredTimeSlot} onValueChange={(v) => setPreferredTimeSlot(v as 'morning' | 'afternoon' | 'evening')}>
                     <SelectTrigger id="time-slot">
                       <SelectValue />
                     </SelectTrigger>
@@ -379,7 +375,7 @@ export function BookingForm({ open, onOpenChange, onSuccess }: BookingFormProps)
             )}
 
             {/* Step 4: Review */}
-            {step === 4 && (
+            {step === 4 && serviceType && pricing && (
               <div className="space-y-4">
                 <Card>
                   <CardHeader>
@@ -388,7 +384,9 @@ export function BookingForm({ open, onOpenChange, onSuccess }: BookingFormProps)
                   <CardContent className="space-y-3">
                     <div>
                       <p className="text-sm text-neutral-500">Service Type</p>
-                      <p className="font-medium">{SERVICE_TYPE_LABELS[serviceType]}</p>
+                      <p className="font-medium text-lg">
+                        {SERVICE_TYPE_LABELS[serviceType]}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-neutral-500">Date & Time</p>
@@ -405,11 +403,11 @@ export function BookingForm({ open, onOpenChange, onSuccess }: BookingFormProps)
                       <p className="font-medium">{customerPhone}</p>
                     </div>
                     <div className="pt-3 border-t">
-                      <p className="text-sm text-neutral-500">Estimated Cost</p>
+                      <p className="text-sm text-neutral-500">Agreed Price</p>
                       <p className="text-2xl font-bold text-primary-600">
-                        {formatCurrency(SERVICE_BASE_PRICING[serviceType])}
+                        {formatCurrency(pricing[serviceType])}
                       </p>
-                      <p className="text-xs text-neutral-500 mt-1">Final cost may vary based on assessment</p>
+                      <p className="text-xs text-neutral-500 mt-1">Price locked at booking time</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -432,7 +430,13 @@ export function BookingForm({ open, onOpenChange, onSuccess }: BookingFormProps)
               )}
               <div className="ml-auto">
                 {step < 4 ? (
-                  <Button onClick={nextStep} disabled={step === 3 && (!preferredDate || !address || !customerPhone)}>
+                  <Button 
+                    onClick={nextStep} 
+                    disabled={
+                      (step === 1 && !serviceType) ||
+                      (step === 3 && (!preferredDate || !address || !customerPhone))
+                    }
+                  >
                     Next
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>

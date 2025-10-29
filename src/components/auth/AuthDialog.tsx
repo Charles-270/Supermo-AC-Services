@@ -14,6 +14,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -32,9 +33,10 @@ interface AuthDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultTab?: 'login' | 'register';
+  defaultRole?: UserRole;
 }
 
-export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDialogProps) {
+export function AuthDialog({ open, onOpenChange, defaultTab = 'login', defaultRole }: AuthDialogProps) {
   const { signIn, signUp, signInWithGoogle, refreshProfile, resetPassword } = useAuth();
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [loading, setLoading] = useState(false);
@@ -51,7 +53,7 @@ export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDia
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [role, setRole] = useState<UserRole>('customer');
+  const [role, setRole] = useState<UserRole>(defaultRole || 'customer');
 
   /**
    * Handle Login
@@ -202,9 +204,8 @@ export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDia
                     Forgot password?
                   </button>
                 </div>
-                <Input
+                <PasswordInput
                   id="login-password"
-                  type="password"
                   placeholder="••••••••"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
@@ -316,9 +317,8 @@ export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDia
 
               <div className="space-y-2">
                 <Label htmlFor="register-password">Password</Label>
-                <Input
+                <PasswordInput
                   id="register-password"
-                  type="password"
                   placeholder="At least 6 characters"
                   value={registerPassword}
                   onChange={(e) => setRegisterPassword(e.target.value)}
@@ -329,9 +329,8 @@ export function AuthDialog({ open, onOpenChange, defaultTab = 'login' }: AuthDia
 
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm Password</Label>
-                <Input
+                <PasswordInput
                   id="confirm-password"
-                  type="password"
                   placeholder="Re-enter password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}

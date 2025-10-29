@@ -52,8 +52,8 @@ export function ProtectedRoute({
     );
   }
 
-  // Check if account is approved (for admin and technician roles)
-  if (profile && !profile.isApproved && (profile.role === 'admin' || profile.role === 'technician')) {
+  // Check if account is approved (for admin, technician, and supplier roles)
+  if (profile && !profile.isApproved && ['admin', 'technician', 'supplier'].includes(profile.role)) {
     return <Navigate to="/pending-approval" replace />;
   }
 

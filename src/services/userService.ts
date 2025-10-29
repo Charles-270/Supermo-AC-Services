@@ -63,7 +63,7 @@ export async function createUserProfile(
     // Merge with additional data, filtering out undefined values
     const cleanedAdditionalData = additionalData
       ? Object.fromEntries(
-          Object.entries(additionalData).filter(([_, v]) => v !== undefined)
+          Object.entries(additionalData).filter(([, v]) => v !== undefined)
         )
       : {};
 
@@ -263,7 +263,7 @@ export async function approveUser(uid: string): Promise<void> {
 /**
  * Get all pending approval users (Admin only)
  */
-export async function getPendingApprovalUsers(): Promise<any[]> {
+export async function getPendingApprovalUsers(): Promise<UserProfile[]> {
   try {
     const usersRef = collection(db, 'users');
     const q = query(
@@ -272,13 +272,13 @@ export async function getPendingApprovalUsers(): Promise<any[]> {
     );
 
     const querySnapshot = await getDocs(q);
-    const users: any[] = [];
+    const users: UserProfile[] = [];
 
     querySnapshot.forEach((doc) => {
       users.push({
         uid: doc.id,
         ...doc.data(),
-      });
+      } as UserProfile);
     });
 
     return users;
@@ -382,8 +382,8 @@ export async function searchUsers(searchTerm: string): Promise<UserProfile[]> {
 
       if (matchesName || matchesEmail) {
         users.push({
-          uid: doc.id,
           ...userData,
+          uid: userData.uid ?? doc.id,
         });
       }
     });

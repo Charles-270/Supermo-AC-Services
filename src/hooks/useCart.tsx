@@ -3,8 +3,11 @@
  * Global cart state management with localStorage persistence
  */
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import type { CartItem, Product } from '@/types/product';
+import { currencyRound, resolveProductPricing } from '@/utils/pricing';
 
 interface CartContextType {
   cart: CartItem[];
@@ -44,7 +47,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     quantity: number = 1,
     installationRequired: boolean = false
   ) => {
-    console.log('🛒 Adding to cart:', product.name, 'Qty:', quantity, 'Installation:', installationRequired);
+    console.log(
+      '[Cart] Adding to cart:',
+      product.name,
+      'Qty:',
+      quantity,
+      'Installation:',
+      installationRequired
+    );
 
     setCart((prevCart) => {
       const existingItemIndex = prevCart.findIndex(
@@ -55,23 +65,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
         // Update quantity if already in cart
         const updatedCart = [...prevCart];
         updatedCart[existingItemIndex].quantity += quantity;
-        console.log('✅ Cart updated! New quantity:', updatedCart[existingItemIndex].quantity);
+        console.log(
+          '[Cart] Updated quantity:',
+          updatedCart[existingItemIndex].product.name,
+          '->',
+          updatedCart[existingItemIndex].quantity
+        );
         return updatedCart;
-      } else {
-        // Add new item
-        const newCart = [
-          ...prevCart,
-          {
-            product,
-            quantity,
-            installationRequired,
-          },
-        ];
-        console.log('✅ Item added to cart! Total items:', newCart.length);
-        return newCart;
       }
+
+      // Add new item
+      const newCart = [
+        ...prevCart,
+        {
+          product,
+          quantity,
+          installationRequired,
+        },
+      ];
+      console.log('[Cart] Item added. Total items:', newCart.length);
+      return newCart;
     });
   };
+
 
   const removeFromCart = (productId: string) => {
     setCart((prevCart) => prevCart.filter((item) => item.product.id !== productId));
@@ -99,11 +115,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('supremo-cart');
   };
 
-  const getCartTotal = () => {
-    return cart.reduce((total, item) => {
-      return total + item.product.price * item.quantity;
-    }, 0);
-  };
+  const getCartTotal = () =>
+    currencyRound(
+      cart.reduce((total, item) => {
+        const pricing = resolveProductPricing(item.product);
+        return total + pricing.totalPrice * item.quantity;
+      }, 0)
+    );
 
   const getCartItemsCount = () => {
     return cart.reduce((count, item) => count + item.quantity, 0);

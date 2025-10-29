@@ -3,9 +3,10 @@
  * Admin interface for user management
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { AdminApprovals } from '@/components/admin/AdminApprovals';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +38,6 @@ import {
   ArrowLeft,
   Search,
   Filter,
-  UserPlus,
   UserCheck,
   UserX,
   Trash2,
@@ -47,7 +47,6 @@ import {
   Loader2,
   Download,
   RefreshCw,
-  Eye,
 } from 'lucide-react';
 import {
   getAllUsers,
@@ -65,7 +64,7 @@ import { toast } from '@/components/ui/use-toast';
 export default function ManageUsers() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
-  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -83,10 +82,6 @@ export default function ManageUsers() {
     fetchUsers();
     fetchPendingUsers();
   }, []);
-
-  useEffect(() => {
-    filterUsers();
-  }, [users, searchQuery, roleFilter, statusFilter]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -109,7 +104,7 @@ export default function ManageUsers() {
     }
   };
 
-  const filterUsers = () => {
+  const filterUsers = useCallback(() => {
     let filtered = [...users];
 
     // Search filter
@@ -136,7 +131,11 @@ export default function ManageUsers() {
     }
 
     setFilteredUsers(filtered);
-  };
+  }, [users, searchQuery, roleFilter, statusFilter]);
+
+  useEffect(() => {
+    filterUsers();
+  }, [filterUsers]);
 
   const handleSelectUser = (uid: string) => {
     const newSelected = new Set(selectedUsers);
@@ -287,9 +286,9 @@ export default function ManageUsers() {
     document.body.removeChild(link);
   };
 
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: { toDate: () => Date } | Date | string | undefined) => {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = typeof timestamp === 'object' && 'toDate' in timestamp ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
@@ -438,6 +437,10 @@ export default function ManageUsers() {
             </CardContent>
           </Card>
         )}
+
+        <div className="mb-6">
+          <AdminApprovals />
+        </div>
 
         {/* Filters */}
         <Card className="mb-6">

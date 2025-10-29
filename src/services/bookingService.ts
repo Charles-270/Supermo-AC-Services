@@ -19,10 +19,14 @@ import {
 import type { Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Booking, BookingFormData, BookingStatus } from '@/types/booking';
+import { BOOKING_PLATFORM_COMMISSION_RATE, TECHNICIAN_PAYOUT_RATE } from '@/types/booking';
+import { getServicePrice } from '@/services/pricingService';
 import {
   assignJobToTechnician,
   removeJobFromTechnician,
   getTechnicianById,
+  incrementTechnicianJobsCompleted,
+  updateTechnicianRating,
 } from '@/services/technicianService';
 
 /**
@@ -35,13 +39,15 @@ export async function createBooking(
   userEmail: string
 ): Promise<string> {
   try {
-    const bookingData: any = {
+    const bookingData: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> = {
       customerId: userId,
       customerName: userName,
       customerEmail: userEmail,
       customerPhone: formData.customerPhone,
 
       serviceType: formData.serviceType,
+      servicePackage: formData.servicePackage,
+      agreedPrice: await getServicePrice(formData.serviceType),
       serviceDetails: formData.serviceDetails,
 
       preferredDate: formData.preferredDate as unknown as Timestamp,
@@ -68,6 +74,8 @@ export async function createBooking(
     });
 
     console.log('✅ Booking created:', docRef.id);
+    console.log('💰 Agreed price set to:', bookingData.agreedPrice);
+    console.log('🔧 Service type:', formData.serviceType, 'Price:', bookingData.agreedPrice);
     return docRef.id;
   } catch (error) {
     console.error('Error creating booking:', error);
@@ -250,14 +258,16 @@ export async function assignTechnician(
 }
 
 /**
- * Update booking with service completion details
+ * Update booking with service completion details and track revenue
  */
 export async function completeBooking(
   bookingId: string,
   completionData: {
     finalCost: number;
     serviceNotes: string;
+    beforePhotos?: string[];
     afterPhotos?: string[];
+    laborHours?: number;
   }
 ): Promise<void> {
   try {
@@ -273,18 +283,57 @@ export async function completeBooking(
       ...bookingSnap.data(),
     } as Booking;
 
-    await updateDoc(bookingRef, {
-      ...completionData,
+    // Calculate revenue breakdown
+    const finalCost = completionData.finalCost;
+    const platformCommission = finalCost * BOOKING_PLATFORM_COMMISSION_RATE; // 10%
+    const technicianPayout = finalCost * TECHNICIAN_PAYOUT_RATE; // 90%
+
+    // Update booking with completion details - explicitly list fields to avoid serialization issues
+    const updateData: Record<string, unknown> = {
+      finalCost: completionData.finalCost,
+      serviceNotes: completionData.serviceNotes,
       status: 'completed',
       completedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+    };
+
+    // Add optional fields only if they exist
+    if (completionData.beforePhotos) {
+      updateData.beforePhotos = completionData.beforePhotos;
+    }
+    if (completionData.afterPhotos) {
+      updateData.afterPhotos = completionData.afterPhotos;
+    }
+    if (completionData.laborHours !== undefined) {
+      updateData.laborHours = completionData.laborHours;
+    }
+
+    await updateDoc(bookingRef, updateData);
+
+    // Create revenue record for admin tracking
+    const revenueRef = collection(db, 'revenue');
+    await addDoc(revenueRef, {
+      bookingId: bookingId,
+      customerId: bookingData.customerId,
+      technicianId: bookingData.technicianId,
+      serviceType: bookingData.serviceType,
+      servicePackage: bookingData.servicePackage,
+      agreedPrice: bookingData.agreedPrice || 0,
+      finalCost: finalCost,
+      platformCommission: platformCommission,
+      technicianPayout: technicianPayout,
+      completedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
     });
 
     if (bookingData.technicianId) {
       await removeJobFromTechnician(bookingData.technicianId, bookingId);
+      // Sync: Update technician's total jobs completed count
+      await incrementTechnicianJobsCompleted(bookingData.technicianId);
     }
 
     console.log('✅ Booking completed:', bookingId);
+    console.log('💰 Revenue tracked - Commission:', platformCommission, 'Technician Payout:', technicianPayout);
   } catch (error) {
     console.error('Error completing booking:', error);
     throw new Error('Failed to complete booking');
@@ -301,11 +350,27 @@ export async function addBookingReview(
 ): Promise<void> {
   try {
     const bookingRef = doc(db, 'bookings', bookingId);
+    const bookingSnap = await getDoc(bookingRef);
+
+    if (!bookingSnap.exists()) {
+      throw new Error('Booking not found');
+    }
+
+    const bookingData = {
+      id: bookingSnap.id,
+      ...bookingSnap.data(),
+    } as Booking;
+
     await updateDoc(bookingRef, {
       customerRating: rating,
       customerReview: review,
       updatedAt: serverTimestamp(),
     });
+
+    // Sync: Update technician's average rating based on all ratings
+    if (bookingData.technicianId) {
+      await updateTechnicianRating(bookingData.technicianId);
+    }
 
     console.log('✅ Booking review added:', bookingId);
   } catch (error) {

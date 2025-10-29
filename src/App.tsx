@@ -1,46 +1,75 @@
 /**
  * Main App Component
  * React Router with protected routes for 5 user dashboards
+ * Uses lazy loading for optimal performance - only loads routes when needed
  */
 
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/hooks/useAuth';
 import { CartProvider } from '@/hooks/useCart';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { LandingPage } from '@/pages/LandingPage';
-import { PendingApproval } from '@/pages/PendingApproval';
-import { CustomerDashboard } from '@/pages/dashboards/CustomerDashboard';
-import { TechnicianDashboard } from '@/pages/dashboards/TechnicianDashboard';
-import { SupplierDashboard } from '@/pages/dashboards/SupplierDashboard';
-import { AdminDashboard } from '@/pages/dashboards/AdminDashboard';
-import { TraineeDashboard } from '@/pages/dashboards/TraineeDashboard';
-import JobDetail from '@/pages/technician/JobDetail';
-import JobComplete from '@/pages/technician/JobComplete';
-import { ProductCatalog } from '@/pages/products/ProductCatalog';
-import { ProductDetail } from '@/pages/products/ProductDetail';
-import { Cart } from '@/pages/products/Cart';
-import { Checkout } from '@/pages/products/Checkout';
-import { OrderSuccess } from '@/pages/products/OrderSuccess';
-import { OrderHistory } from '@/pages/orders/OrderHistory';
-import { OrderDetails } from '@/pages/orders/OrderDetails';
-import UpdateProducts from '@/pages/admin/UpdateProducts';
-import UploadImages from '@/pages/admin/UploadImages';
-import RemoveDuplicates from '@/pages/admin/RemoveDuplicates';
-import ClearImages from '@/pages/admin/ClearImages';
-import ManageProducts from '@/pages/admin/ManageProducts';
-import ManageOrders from '@/pages/admin/ManageOrders';
-import ManageUsers from '@/pages/admin/ManageUsers';
-import Analytics from '@/pages/admin/Analytics';
-import PlatformSettings from '@/pages/admin/PlatformSettings';
-import { TestTechnicianSelector } from '@/pages/TestTechnicianSelector';
 import { Toaster } from '@/components/ui/toaster';
+import { initAnalytics } from '@/lib/firebase';
+
+// Eager load only the landing page (first page users see)
+import { LandingPage } from '@/pages/LandingPage';
+
+// Lazy load all other pages - they'll load only when navigated to
+const PendingApproval = lazy(() => import('@/pages/PendingApproval').then(m => ({ default: m.PendingApproval })));
+const CustomerDashboard = lazy(() => import('@/pages/dashboards/CustomerDashboard').then(m => ({ default: m.CustomerDashboard })));
+const TechnicianOverview = lazy(() => import('@/pages/dashboards/TechnicianOverview').then(m => ({ default: m.TechnicianOverview })));
+const SupplierOverview = lazy(() => import('@/pages/dashboards/SupplierOverview').then(m => ({ default: m.SupplierOverview })));
+const SupplierProducts = lazy(() => import('@/pages/dashboards/SupplierProducts').then(m => ({ default: m.SupplierProducts })));
+const SupplierSettings = lazy(() => import('@/pages/dashboards/SupplierSettings').then(m => ({ default: m.SupplierSettings })));
+const AdminDashboard = lazy(() => import('@/pages/dashboards/AdminDashboardRedesigned').then(m => ({ default: m.AdminDashboardRedesigned })));
+const TraineeDashboard = lazy(() => import('@/pages/dashboards/TraineeDashboard').then(m => ({ default: m.TraineeDashboard })));
+const JobDetail = lazy(() => import('@/pages/technician/JobDetail'));
+const JobComplete = lazy(() => import('@/pages/technician/JobComplete'));
+const JobsList = lazy(() => import('@/pages/technician/JobsList'));
+const EarningsHistory = lazy(() => import('@/pages/technician/EarningsHistory'));
+const TechnicianSettings = lazy(() => import('@/pages/dashboards/TechnicianSettings').then(m => ({ default: m.TechnicianSettings })));
+const ProductCatalog = lazy(() => import('@/pages/products/ProductCatalogRedesigned').then(m => ({ default: m.ProductCatalogRedesigned })));
+const ProductDetail = lazy(() => import('@/pages/products/ProductDetail').then(m => ({ default: m.ProductDetail })));
+const Cart = lazy(() => import('@/pages/cart/CartPage'));
+const Checkout = lazy(() => import('@/pages/checkout/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
+const OrderHistory = lazy(() => import('@/pages/orders/OrderHistoryRedesigned').then(m => ({ default: m.OrderHistoryRedesigned })));
+const OrderDetails = lazy(() => import('@/pages/orders/OrderDetailsRedesigned').then(m => ({ default: m.OrderDetailsRedesigned })));
+const UpdateProducts = lazy(() => import('@/pages/admin/UpdateProducts'));
+const UploadImages = lazy(() => import('@/pages/admin/UploadImages'));
+const RemoveDuplicates = lazy(() => import('@/pages/admin/RemoveDuplicates'));
+const ClearImages = lazy(() => import('@/pages/admin/ClearImages'));
+const ManageProducts = lazy(() => import('@/pages/admin/ManageProductsRedesigned'));
+const ManageOrders = lazy(() => import('@/pages/admin/ManageOrders'));
+const AdminCatalog = lazy(() => import('@/pages/admin/AdminCatalog'));
+const ManageSuppliers = lazy(() => import('@/pages/admin/ManageSuppliers').then(m => ({ default: m.ManageSuppliers })));
+const ManageBookings = lazy(() => import('@/pages/admin/ManageBookings').then(m => ({ default: m.ManageBookings })));
+const BackfillTechnicianStats = lazy(() => import('@/pages/admin/BackfillTechnicianStats'));
+const ManageUsers = lazy(() => import('@/pages/admin/ManageUsersRedesigned'));
+const Analytics = lazy(() => import('@/pages/admin/Analytics'));
+const PlatformSettings = lazy(() => import('@/pages/admin/PlatformSettings'));
+const TestTechnicianSelector = lazy(() => import('@/pages/TestTechnicianSelector').then(m => ({ default: m.TestTechnicianSelector })));
+const BookServicesPage = lazy(() => import('@/pages/BookServicesPage').then(m => ({ default: m.BookServicesPage })));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+  </div>
+);
 
 function App() {
+  // Initialize Firebase Analytics after page renders (non-blocking)
+  useEffect(() => {
+    initAnalytics();
+  }, []);
+
   return (
     <BrowserRouter>
       <AuthProvider>
         <CartProvider>
-          <Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LandingPage />} />
@@ -68,11 +97,30 @@ function App() {
             }
           />
 
+          {/* Customer Booking Routes */}
+          <Route
+            path="/book-services"
+            element={
+              <ProtectedRoute requiredRole="customer">
+                <BookServicesPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/customer/bookings"
+            element={
+              <ProtectedRoute requiredRole="customer">
+                <CustomerDashboard />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/dashboard/technician"
             element={
               <ProtectedRoute requiredRole="technician">
-                <TechnicianDashboard />
+                <TechnicianOverview />
               </ProtectedRoute>
             }
           />
@@ -97,10 +145,55 @@ function App() {
           />
 
           <Route
+            path="/technician/jobs"
+            element={
+              <ProtectedRoute requiredRole="technician">
+                <JobsList />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/technician/earnings"
+            element={
+              <ProtectedRoute requiredRole="technician">
+                <EarningsHistory />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/technician/settings"
+            element={
+              <ProtectedRoute requiredRole="technician">
+                <TechnicianSettings />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/dashboard/supplier"
             element={
               <ProtectedRoute requiredRole="supplier">
-                <SupplierDashboard />
+                <SupplierOverview />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/supplier/products"
+            element={
+              <ProtectedRoute requiredRole="supplier">
+                <SupplierProducts />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/supplier/settings"
+            element={
+              <ProtectedRoute requiredRole="supplier">
+                <SupplierSettings />
               </ProtectedRoute>
             }
           />
@@ -123,7 +216,7 @@ function App() {
             }
           />
 
-          {/* Admin Utilities */}
+          {/* Admin Utilities - Keep for development */}
           <Route
             path="/admin/update-products"
             element={
@@ -161,7 +254,26 @@ function App() {
           />
 
           <Route
-            path="/admin/manage-products"
+            path="/admin/backfill-technician-stats"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <BackfillTechnicianStats />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* New Admin Routes with Sidebar */}
+          <Route
+            path="/dashboard/admin/users"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <ManageUsers />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/ecommerce/products"
             element={
               <ProtectedRoute requiredRole="admin">
                 <ManageProducts />
@@ -170,7 +282,7 @@ function App() {
           />
 
           <Route
-            path="/admin/manage-orders"
+            path="/dashboard/admin/ecommerce/orders"
             element={
               <ProtectedRoute requiredRole="admin">
                 <ManageOrders />
@@ -179,12 +291,84 @@ function App() {
           />
 
           <Route
-            path="/admin/manage-users"
+            path="/dashboard/admin/ecommerce/catalog"
             element={
               <ProtectedRoute requiredRole="admin">
-                <ManageUsers />
+                <AdminCatalog />
               </ProtectedRoute>
             }
+          />
+
+          <Route
+            path="/dashboard/admin/suppliers"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <ManageSuppliers />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/bookings"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <ManageBookings />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/analytics"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <Analytics />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/settings"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <PlatformSettings />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Legacy Admin Routes - Redirect to new routes */}
+          <Route
+            path="/admin/manage-users"
+            element={<Navigate to="/dashboard/admin/users" replace />}
+          />
+
+          <Route
+            path="/admin/manage-products"
+            element={<Navigate to="/dashboard/admin/ecommerce/products" replace />}
+          />
+
+          <Route
+            path="/admin/manage-orders"
+            element={<Navigate to="/dashboard/admin/ecommerce/orders" replace />}
+          />
+
+          <Route
+            path="/admin/manage-suppliers"
+            element={<Navigate to="/dashboard/admin/suppliers" replace />}
+          />
+
+          <Route
+            path="/admin/manage-bookings"
+            element={<Navigate to="/dashboard/admin/bookings" replace />}
+          />
+
+          <Route
+            path="/admin/analytics"
+            element={<Navigate to="/dashboard/admin/analytics" replace />}
+          />
+
+          <Route
+            path="/admin/settings"
+            element={<Navigate to="/dashboard/admin/settings" replace />}
           />
 
           <Route
@@ -242,15 +426,6 @@ function App() {
             }
           />
 
-          <Route
-            path="/orders/:orderId/success"
-            element={
-              <ProtectedRoute>
-                <OrderSuccess />
-              </ProtectedRoute>
-            }
-          />
-
           {/* Order Management Routes */}
           <Route
             path="/orders"
@@ -272,8 +447,9 @@ function App() {
 
           {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-        <Toaster />
+          </Routes>
+          </Suspense>
+          <Toaster />
         </CartProvider>
       </AuthProvider>
     </BrowserRouter>

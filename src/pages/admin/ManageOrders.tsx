@@ -1,16 +1,18 @@
 /**
- * Admin Orders Management
+ * Admin Orders Management - Redesigned
  * View and manage all customer orders
+ * Google Stitch-inspired design - October 2025
  */
 
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -26,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Package,
   Search,
@@ -33,25 +36,38 @@ import {
   Calendar,
   CreditCard,
   MapPin,
-  Eye,
   Edit,
   Truck,
   CheckCircle,
   XCircle,
   Download,
   FileText,
-  CheckSquare,
-  Square,
+  Users,
+  AlertCircle,
+  ShoppingBag,
 } from 'lucide-react';
 import {
   getAllOrders,
   updateOrderStatus,
   updateTrackingNumber,
+  assignOrderToSupplier,
+  updateSupplierAssignmentStatus,
+  type OrderAssignmentInput,
 } from '@/services/productService';
-import { formatCurrency } from '@/lib/utils';
+import {
+  getActiveCatalogItemsByProductIds,
+  getSupplierProfile,
+} from '@/services/supplierService';
+import { formatCurrency, resolveDate } from '@/lib/utils';
 import { exportOrdersToCSV, exportDetailedOrdersToCSV } from '@/utils/exportToCSV';
 import { printPackingSlip } from '@/utils/printInvoice';
-import type { Order, OrderStatus } from '@/types/product';
+import type {
+  Order,
+  OrderStatus,
+  SupplierCatalogItem,
+  SupplierAssignmentStatus,
+  SupplierAssignmentItem,
+} from '@/types/product';
 import { toast } from '@/components/ui/use-toast';
 
 // Status configurations
@@ -70,7 +86,6 @@ const STATUS_CONFIG: Record<
 };
 
 export default function ManageOrders() {
-  const navigate = useNavigate();
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +113,21 @@ export default function ManageOrders() {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [updating, setUpdating] = useState(false);
 
+  // Supplier assignment
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignOrder, setAssignOrder] = useState<Order | null>(null);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [selectedSupplierId, setSelectedSupplierId] = useState('');
+  const [assignNotes, setAssignNotes] = useState('');
+  const [availableCatalog, setAvailableCatalog] = useState<Record<string, SupplierCatalogItem[]>>(
+    {}
+  );
+  const [availableSuppliers, setAvailableSuppliers] = useState<
+    Record<string, { name: string; company?: string | null }>
+  >({});
+  const [assignmentStatusUpdating, setAssignmentStatusUpdating] = useState<string | null>(null);
+
   useEffect(() => {
     fetchOrders();
   }, []);
@@ -114,9 +144,9 @@ export default function ManageOrders() {
     }
   };
 
-  const formatDate = (timestamp: any) => {
-    if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  const formatDate = (timestamp: Date | string | number | { toDate: () => Date } | null | undefined) => {
+    const date = resolveDate(timestamp);
+    if (!date) return 'N/A';
     return date.toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
@@ -166,6 +196,280 @@ export default function ManageOrders() {
       setUpdating(false);
     }
   };
+
+  const closeAssignmentDialog = () => {
+    setAssignDialogOpen(false);
+    setAssignOrder(null);
+    setAvailableCatalog({});
+    setAvailableSuppliers({});
+    setSelectedSupplierId('');
+    setAssignNotes('');
+    setAssignLoading(false);
+  };
+
+  const handleAssignmentDialogChange = (open: boolean) => {
+    if (!open) {
+      closeAssignmentDialog();
+    }
+  };
+
+  const handleOpenAssignmentDialog = async (order: Order) => {
+    setAssignOrder(order);
+    setAssignDialogOpen(true);
+    setAssignLoading(true);
+    setSelectedSupplierId('');
+    setAssignNotes('');
+    setAvailableCatalog({});
+    setAvailableSuppliers({});
+
+    try {
+      const productIds = order.items.map((item) => item.productId).filter(Boolean);
+
+      if (productIds.length === 0) {
+        toast({
+          title: 'No products available',
+          description: 'This order does not contain any products to assign.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const catalogMap = await getActiveCatalogItemsByProductIds(productIds);
+      setAvailableCatalog(catalogMap);
+
+      const supplierIds = new Set<string>();
+      Object.values(catalogMap).forEach((items) => {
+        items.forEach((item) => supplierIds.add(item.supplierId));
+      });
+
+      if (supplierIds.size === 0) {
+        toast({
+          title: 'No supplier availability',
+          description: 'No suppliers currently have inventory for the items in this order.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const profiles = await Promise.all(
+        Array.from(supplierIds).map(async (supplierId) => {
+          try {
+            return await getSupplierProfile(supplierId);
+          } catch (error) {
+            console.error('Error fetching supplier profile:', error);
+            return null;
+          }
+        })
+      );
+
+      const profileMap: Record<string, { name: string; company?: string | null }> = {};
+      profiles.forEach((profile) => {
+        if (profile) {
+          profileMap[profile.uid] = {
+            name: profile.displayName,
+            company: profile.metadata?.companyName ?? null,
+          };
+        }
+      });
+
+      setAvailableSuppliers(profileMap);
+    } catch (error) {
+      console.error('Error loading supplier availability:', error);
+      toast({
+        title: 'Failed to load suppliers',
+        description: 'Unable to load supplier availability for this order.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const assignmentCandidates = useMemo(() => {
+    if (!assignOrder) return [];
+
+    const supplierMap = new Map<
+      string,
+      {
+        supplierId: string;
+        supplierName: string;
+        items: SupplierAssignmentItem[];
+        coverage: Set<string>;
+        insufficient: boolean;
+        minLeadTime: number | null;
+        notes?: string | null;
+      }
+    >();
+
+    assignOrder.items.forEach((orderItem) => {
+      const catalogItems = availableCatalog[orderItem.productId] || [];
+
+      catalogItems.forEach((catalogItem) => {
+        if (!supplierMap.has(catalogItem.supplierId)) {
+          supplierMap.set(catalogItem.supplierId, {
+            supplierId: catalogItem.supplierId,
+            supplierName:
+              availableSuppliers[catalogItem.supplierId]?.company ||
+              availableSuppliers[catalogItem.supplierId]?.name ||
+              catalogItem.supplierId,
+            items: [],
+            coverage: new Set<string>(),
+            insufficient: false,
+            minLeadTime: catalogItem.leadTimeDays ?? null,
+            notes: catalogItem.notes ?? null,
+          });
+        }
+
+        const entry = supplierMap.get(catalogItem.supplierId)!;
+        const item: SupplierAssignmentItem = {
+          productId: orderItem.productId,
+          quantity: orderItem.quantity,
+        };
+        if (catalogItem.id) {
+          item.catalogItemId = catalogItem.id;
+        }
+        entry.items.push(item);
+
+        if (catalogItem.deliveryRegions) {
+          catalogItem.deliveryRegions.forEach((region) => entry.coverage.add(region));
+        }
+
+        if (catalogItem.stockQuantity < orderItem.quantity) {
+          entry.insufficient = true;
+        }
+
+        if (catalogItem.leadTimeDays !== undefined && catalogItem.leadTimeDays !== null) {
+          entry.minLeadTime =
+            entry.minLeadTime === null
+              ? catalogItem.leadTimeDays
+              : Math.max(entry.minLeadTime, catalogItem.leadTimeDays);
+        }
+      });
+    });
+
+    return Array.from(supplierMap.values()).map((entry) => ({
+      supplierId: entry.supplierId,
+      supplierName: entry.supplierName,
+      items: entry.items,
+      coverage: Array.from(entry.coverage),
+      insufficient: entry.insufficient,
+      minLeadTime: entry.minLeadTime,
+      notes: entry.notes,
+      fullCoverage: entry.items.length === assignOrder.items.length,
+    }));
+  }, [assignOrder, availableCatalog, availableSuppliers]);
+
+  const sortedAssignmentCandidates = useMemo(() => {
+    const candidates = [...assignmentCandidates];
+    candidates.sort((a, b) => {
+      if (a.fullCoverage !== b.fullCoverage) {
+        return a.fullCoverage ? -1 : 1;
+      }
+      if (a.insufficient !== b.insufficient) {
+        return a.insufficient ? 1 : -1;
+      }
+      return (a.minLeadTime ?? 0) - (b.minLeadTime ?? 0);
+    });
+    return candidates;
+  }, [assignmentCandidates]);
+
+  const handleSubmitAssignment = async () => {
+    if (!assignOrder || !selectedSupplierId) {
+      toast({
+        title: 'Select a supplier',
+        description: 'Choose a supplier to assign before submitting.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const candidate = sortedAssignmentCandidates.find(
+      (item) => item.supplierId === selectedSupplierId
+    );
+
+    if (!candidate) {
+      toast({
+        title: 'Supplier not available',
+        description: 'Selected supplier is no longer available. Refresh and try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const payload: OrderAssignmentInput = {
+      supplierId: candidate.supplierId,
+      supplierName: candidate.supplierName,
+      items: candidate.items,
+      ...(assignNotes.trim() && { notes: assignNotes.trim() }),
+    };
+
+    setAssignSubmitting(true);
+    try {
+      await assignOrderToSupplier(assignOrder.id, payload);
+      toast({
+        title: 'Supplier assigned',
+        description: `${candidate.supplierName} has been assigned to ${assignOrder.orderNumber}.`,
+      });
+      closeAssignmentDialog();
+      await fetchOrders();
+    } catch (error) {
+      console.error('Error assigning supplier:', error);
+      toast({
+        title: 'Assignment failed',
+        description: 'Could not assign supplier. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAssignSubmitting(false);
+    }
+  };
+
+  const handleUpdateAssignmentStatus = async (
+    orderId: string,
+    supplierId: string,
+    status: SupplierAssignmentStatus
+  ) => {
+    const key = `${orderId}:${supplierId}:${status}`;
+    setAssignmentStatusUpdating(key);
+    try {
+      await updateSupplierAssignmentStatus(orderId, supplierId, status);
+      toast({
+        title: 'Assignment updated',
+        description: `Supplier marked as ${formatAssignmentStatus(status)}.`,
+      });
+      await fetchOrders();
+    } catch (error) {
+      console.error('Error updating supplier assignment status:', error);
+      toast({
+        title: 'Update failed',
+        description: 'Could not update supplier assignment status.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAssignmentStatusUpdating(null);
+    }
+  };
+
+  const getAssignmentBadgeVariant = (status: SupplierAssignmentStatus) => {
+    switch (status) {
+      case 'fulfilled':
+        return 'secondary';
+      case 'accepted':
+        return 'default';
+      case 'declined':
+        return 'destructive';
+      case 'reassigned':
+        return 'outline';
+      default:
+        return 'outline';
+    }
+  };
+
+  const formatAssignmentStatus = (status: SupplierAssignmentStatus) =>
+    status
+      .split('-')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
 
   // Bulk selection handlers
   const toggleOrderSelection = (orderId: string) => {
@@ -242,7 +546,7 @@ export default function ManageOrders() {
     // Date range filter
     let matchesDateRange = true;
     if (startDate || endDate) {
-      const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
+      const orderDate = resolveDate(order.createdAt) ?? new Date(0);
       if (startDate) {
         matchesDateRange = matchesDateRange && orderDate >= new Date(startDate);
       }
@@ -275,103 +579,149 @@ export default function ManageOrders() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-cool">
-      {/* Header */}
-      <header className="bg-white border-b border-neutral-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <AdminLayout
+      title="Manage Orders"
+      subtitle={`${filteredOrders.length} ${filteredOrders.length === 1 ? 'order' : 'orders'}${selectedOrders.size > 0 ? ` • ${selectedOrders.size} selected` : ''}`}
+      breadcrumbs={[
+        { label: 'Dashboard', href: '/dashboard/admin' },
+        { label: 'E-Commerce', href: '/dashboard/admin/ecommerce/orders' },
+        { label: 'Orders' }
+      ]}
+    >
+      <div className="space-y-6">
+        {/* Bulk Actions Toolbar */}
+        {selectedOrders.size > 0 && (
+          <Card className="border-blue-200 bg-blue-50/50 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-base">
+                  {selectedOrders.size} selected
+                </Badge>
+                <Button
+                  size="sm"
+                  onClick={() => setBulkDialogOpen(true)}
+                  className="ml-auto"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Bulk Update Status
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleExportCSV}
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Export CSV
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleExportDetailedCSV}
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Detailed CSV
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedOrders(new Set())}
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Clear
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Original header content moved here */}
+        <div className="hidden">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-neutral-900">Manage Orders</h1>
               <p className="text-sm text-neutral-600">
                 {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
                 {selectedOrders.size > 0 && ` (${selectedOrders.size} selected)`}
               </p>
             </div>
-            <Button variant="outline" onClick={() => navigate('/dashboard/admin')}>
-              Back to Dashboard
-            </Button>
           </div>
 
-          {/* Bulk Actions Toolbar */}
-          {selectedOrders.size > 0 && (
-            <div className="flex items-center gap-2 p-3 bg-primary-50 rounded-lg border border-primary-200">
-              <Badge variant="secondary" className="text-base">
-                {selectedOrders.size} selected
-              </Badge>
-              <Button
-                size="sm"
-                onClick={() => setBulkDialogOpen(true)}
-                className="ml-auto"
-              >
-                <Edit className="h-4 w-4 mr-1" />
-                Bulk Update Status
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleExportCSV}
-              >
-                <Download className="h-4 w-4 mr-1" />
-                Export CSV
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleExportDetailedCSV}
-              >
-                <FileText className="h-4 w-4 mr-1" />
-                Detailed CSV
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setSelectedOrders(new Set())}
-              >
-                <XCircle className="h-4 w-4 mr-1" />
-                Clear
-              </Button>
-            </div>
-          )}
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-primary-600">{stats.total}</div>
-              <div className="text-sm text-neutral-600">Total Orders</div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-6">
+              <p className="text-sm font-medium text-neutral-600 mb-1">Total Orders</p>
+              <p className="text-3xl font-bold text-blue-600">{stats.total}</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
-              <div className="text-sm text-neutral-600">Pending</div>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-6">
+              <p className="text-sm font-medium text-neutral-600 mb-1">Pending</p>
+              <p className="text-3xl font-bold text-amber-600">{stats.pending}</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-blue-600">{stats.processing}</div>
-              <div className="text-sm text-neutral-600">Processing</div>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-6">
+              <p className="text-sm font-medium text-neutral-600 mb-1">Processing</p>
+              <p className="text-3xl font-bold text-blue-600">{stats.processing}</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-purple-600">{stats.shipped}</div>
-              <div className="text-sm text-neutral-600">Shipped</div>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-6">
+              <p className="text-sm font-medium text-neutral-600 mb-1">Shipped</p>
+              <p className="text-3xl font-bold text-purple-600">{stats.shipped}</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-success-600">{stats.delivered}</div>
-              <div className="text-sm text-neutral-600">Delivered</div>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-6">
+              <p className="text-sm font-medium text-neutral-600 mb-1">Delivered</p>
+              <p className="text-3xl font-bold text-green-600">{stats.delivered}</p>
             </CardContent>
           </Card>
         </div>
+
+        {/* Notification Alerts */}
+        {!loading && (
+          <div className="mb-6">
+            {stats.pending > 0 && (
+              <Alert className="border-amber-500 bg-amber-50">
+                <ShoppingBag className="h-5 w-5 text-amber-600" />
+                <AlertTitle className="text-amber-900">
+                  {stats.pending} {stats.pending === 1 ? 'Order' : 'Orders'} Awaiting Payment Confirmation
+                </AlertTitle>
+                <AlertDescription className="text-amber-800">
+                  {stats.pending === 1
+                    ? 'There is 1 order pending payment confirmation.'
+                    : `There are ${stats.pending} orders pending payment confirmation.`}{' '}
+                  Review and process these orders to move them forward.
+                </AlertDescription>
+              </Alert>
+            )}
+            {stats.processing > 0 && stats.pending === 0 && (
+              <Alert className="border-primary-500 bg-primary-50">
+                <Package className="h-5 w-5 text-primary-600" />
+                <AlertTitle className="text-primary-900">
+                  {stats.processing} {stats.processing === 1 ? 'Order' : 'Orders'} Being Processed
+                </AlertTitle>
+                <AlertDescription className="text-primary-800">
+                  Active orders are being prepared for shipment. Assign suppliers if needed.
+                </AlertDescription>
+              </Alert>
+            )}
+            {stats.pending === 0 && stats.processing === 0 && stats.total > 0 && (
+              <Alert className="border-success-500 bg-green-50">
+                <CheckCircle className="h-5 w-5 text-success-600" />
+                <AlertTitle className="text-success-900">All Orders Up to Date</AlertTitle>
+                <AlertDescription className="text-success-800">
+                  Great work! All pending orders have been processed.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
 
         {/* Filters */}
-        <Card className="mb-6">
+        <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
               {/* Search */}
@@ -518,8 +868,8 @@ export default function ManageOrders() {
               return (
                 <Card
                   key={order.id}
-                  className={`hover:shadow-lg transition-shadow ${
-                    isSelected ? 'ring-2 ring-primary-500 bg-primary-50' : ''
+                  className={`border-0 shadow-sm hover:shadow-md transition-shadow ${
+                    isSelected ? 'ring-2 ring-blue-500 bg-blue-50' : ''
                   }`}
                 >
                   <CardContent className="p-6">
@@ -536,17 +886,20 @@ export default function ManageOrders() {
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold">{order.orderNumber}</h3>
+                            <h3 className="text-lg font-semibold">
+                              {order.items.length === 1
+                                ? order.items[0].productName
+                                : `${order.items[0].productName}${order.items.length > 1 ? ` +${order.items.length - 1} more` : ''}`}
+                            </h3>
                             <Badge variant={config.variant}>{config.label}</Badge>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-neutral-600">
                             <div className="flex items-center gap-1.5">
-                              <Calendar className="h-4 w-4" />
-                              <span>{formatDate(order.createdAt)}</span>
+                              <span className="font-medium">{order.orderNumber}</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                              <Package className="h-4 w-4" />
-                              <span>{order.items.length} items</span>
+                              <Calendar className="h-4 w-4" />
+                              <span>{formatDate(order.createdAt)}</span>
                             </div>
                           </div>
                         </div>
@@ -597,22 +950,15 @@ export default function ManageOrders() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2">
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
-                        onClick={() => navigate(`/orders/${order.id}`)}
+                        onClick={() => handleOpenAssignmentDialog(order)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => printPackingSlip(order)}
-                      >
-                        <Truck className="h-4 w-4 mr-1" />
-                        Packing Slip
+                        <Users className="h-4 w-4 mr-1" />
+                        Assign Supplier
                       </Button>
                       <Button
                         variant="default"
@@ -622,14 +968,250 @@ export default function ManageOrders() {
                         <Edit className="h-4 w-4 mr-1" />
                         Update Status
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => printPackingSlip(order)}
+                      >
+                        <Truck className="h-4 w-4 mr-1" />
+                        Packing Slip
+                      </Button>
+                      {/* Note: All order details are displayed in the card above.
+                          The View Details button has been removed to keep admins in the admin context.
+                          All necessary information (customer, shipping, payment, items, supplier assignments)
+                          is already visible in the expanded card view. */}
                     </div>
+
+                    {order.supplierAssignments && order.supplierAssignments.length > 0 ? (
+                      <div className="mt-4 border-t pt-4 space-y-3">
+                        <p className="text-sm font-semibold">Supplier Assignments</p>
+                        {order.supplierAssignments.map((assignment) => {
+                          const statusKey = `${order.id}:${assignment.supplierId}:fulfilled`;
+                          return (
+                            <div
+                              key={`${order.id}-${assignment.supplierId}`}
+                              className="rounded-md border border-neutral-200 bg-neutral-50 p-3"
+                            >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {assignment.supplierName || assignment.supplierId}
+                                </p>
+                                <p className="text-xs text-neutral-500">
+                                  Assigned{' '}
+                                  {assignment.assignedAt ? formatDate(assignment.assignedAt) : 'N/A'}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={getAssignmentBadgeVariant(assignment.status)}>
+                                  {formatAssignmentStatus(assignment.status)}
+                                </Badge>
+                                {assignment.status !== 'fulfilled' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs"
+                                    onClick={() =>
+                                      handleUpdateAssignmentStatus(
+                                        order.id,
+                                        assignment.supplierId,
+                                        'fulfilled'
+                                      )
+                                    }
+                                    disabled={assignmentStatusUpdating === statusKey}
+                                  >
+                                    {assignmentStatusUpdating === statusKey ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                        Updating...
+                                      </>
+                                    ) : (
+                                      'Mark Fulfilled'
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-2 grid gap-1 text-xs text-neutral-600">
+                              {assignment.items.map((item) => {
+                                const orderItem = order.items.find(
+                                  (oi) => oi.productId === item.productId
+                                );
+                                return (
+                                  <div
+                                    key={`${assignment.supplierId}-${item.productId}`}
+                                    className="flex items-center justify-between"
+                                  >
+                                    <span className="truncate">
+                                      {orderItem?.productName || item.productId}
+                                    </span>
+                                    <span>Qty {item.quantity}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {assignment.notes && (
+                              <p className="text-xs text-neutral-500 mt-2 italic">
+                                Notes: {assignment.notes}
+                              </p>
+                            )}
+                          </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="mt-4 border-t pt-4 text-sm text-neutral-500">
+                        No suppliers assigned yet.
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
             })}
           </div>
         )}
-      </main>
+
+      {/* Assign Supplier Dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={handleAssignmentDialogChange}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Assign Supplier</DialogTitle>
+            <DialogDescription>
+              Match {assignOrder?.orderNumber ?? 'this order'} to suppliers with available inventory.
+            </DialogDescription>
+          </DialogHeader>
+
+          {assignLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+            </div>
+          ) : (
+            <div className="space-y-5 py-2">
+              {assignOrder && (
+                <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+                  <p className="text-sm font-semibold text-neutral-700 mb-3">Order Items</p>
+                  <div className="grid gap-2 text-sm text-neutral-700">
+                    {assignOrder.items.map((item) => (
+                      <div
+                        key={item.productId}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="font-medium truncate max-w-xs">{item.productName}</span>
+                        <span className="text-neutral-500">Qty {item.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-neutral-700">Available Suppliers</p>
+                {sortedAssignmentCandidates.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-3 text-sm text-neutral-600">
+                    <AlertCircle className="h-4 w-4 text-amber-500" />
+                    <span>No suppliers currently have inventory for these items.</span>
+                  </div>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                    {sortedAssignmentCandidates.map((candidate) => {
+                      const disabled = candidate.insufficient;
+                      const isSelected = selectedSupplierId === candidate.supplierId;
+                      return (
+                        <button
+                          key={candidate.supplierId}
+                          type="button"
+                          onClick={() => !disabled && setSelectedSupplierId(candidate.supplierId)}
+                          className={`w-full text-left rounded-md border p-3 transition ${
+                            isSelected
+                              ? 'border-primary-500 bg-primary-50'
+                              : 'border-neutral-200 hover:border-primary-300'
+                          } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-neutral-800">
+                                {candidate.supplierName}
+                              </p>
+                              <p className="text-xs text-neutral-500">
+                                Covers {candidate.items.length} of {assignOrder?.items.length ?? 0}{' '}
+                                items
+                              </p>
+                            </div>
+                            {candidate.insufficient && (
+                              <Badge variant="outline" className="text-amber-600 border-amber-400">
+                                Limited stock
+                              </Badge>
+                            )}
+                            {!candidate.fullCoverage && !candidate.insufficient && (
+                              <Badge variant="outline" className="text-neutral-600">
+                                Partial
+                              </Badge>
+                            )}
+                            {candidate.fullCoverage && !candidate.insufficient && (
+                              <Badge variant="secondary">Full coverage</Badge>
+                            )}
+                          </div>
+                          {candidate.coverage.length > 0 && (
+                            <p className="mt-2 text-xs text-neutral-500">
+                              Regions: {candidate.coverage.join(', ')}
+                            </p>
+                          )}
+                          {candidate.minLeadTime !== null && (
+                            <p className="mt-1 text-xs text-neutral-500">
+                              Avg. lead time: {candidate.minLeadTime} day
+                              {candidate.minLeadTime === 1 ? '' : 's'}
+                            </p>
+                          )}
+                          {candidate.notes && (
+                            <p className="mt-1 text-xs text-neutral-500 italic">
+                              Notes: {candidate.notes}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-sm text-neutral-700">Notes for supplier (optional)</Label>
+                <Textarea
+                  value={assignNotes}
+                  onChange={(event) => setAssignNotes(event.target.value)}
+                  placeholder="Highlight delivery expectations, packaging needs, etc."
+                  className="mt-2"
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeAssignmentDialog}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitAssignment}
+              disabled={
+                assignSubmitting || sortedAssignmentCandidates.length === 0 || !selectedSupplierId
+              }
+            >
+              {assignSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Assigning...
+                </>
+              ) : (
+                <>
+                  <Users className="h-4 w-4 mr-2" />
+                  Assign Supplier
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Update Order Dialog */}
       <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
@@ -748,5 +1330,6 @@ export default function ManageOrders() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }

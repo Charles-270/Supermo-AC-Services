@@ -1,11 +1,12 @@
 /**
- * Analytics Dashboard
+ * Analytics Dashboard - Redesigned
  * Comprehensive analytics and insights for platform performance
+ * Google Stitch-inspired design - October 2025
  */
 
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -16,7 +17,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  ArrowLeft,
   TrendingUp,
   TrendingDown,
   DollarSign,
@@ -70,11 +70,7 @@ export default function Analytics() {
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [serviceAnalytics, setServiceAnalytics] = useState<ServiceAnalytics[]>([]);
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, [timeRange]);
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
       const days = parseInt(timeRange);
@@ -99,17 +95,24 @@ export default function Analytics() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange]);
 
-  const calculateGrowth = (data: any[], key: string) => {
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
+
+  const calculateGrowth = <T extends Record<string, unknown>, K extends keyof T>(
+    data: T[],
+    key: K
+  ) => {
     if (data.length < 2) return 0;
-    const latest = data[data.length - 1]?.[key] || 0;
-    const previous = data[data.length - 2]?.[key] || 0;
+    const latest = Number(data[data.length - 1]?.[key] ?? 0);
+    const previous = Number(data[data.length - 2]?.[key] ?? 0);
     if (previous === 0) return 0;
     return ((latest - previous) / previous) * 100;
   };
 
-  const exportData = (data: any[], filename: string) => {
+  const exportData = <T extends Record<string, unknown>>(data: T[], filename: string) => {
     const csv = convertToCSV(data);
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -121,7 +124,7 @@ export default function Analytics() {
     document.body.removeChild(link);
   };
 
-  const convertToCSV = (data: any[]) => {
+  const convertToCSV = <T extends Record<string, unknown>>(data: T[]) => {
     if (data.length === 0) return '';
     const headers = Object.keys(data[0]).join(',');
     const rows = data.map((row) => Object.values(row).join(','));
@@ -134,43 +137,33 @@ export default function Analytics() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-cool">
-      {/* Header */}
-      <header className="bg-white border-b border-neutral-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard/admin">
-                <Button variant="ghost" size="icon">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-neutral-900">Analytics Dashboard</h1>
-                <p className="text-sm text-neutral-600">Platform performance and insights</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Select value={timeRange} onValueChange={(value: any) => setTimeRange(value)}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" onClick={() => exportData(revenueData, 'analytics')}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </div>
-          </div>
+    <AdminLayout
+      title="Analytics Dashboard"
+      subtitle="Platform performance and insights"
+      breadcrumbs={[
+        { label: 'Dashboard', href: '/dashboard/admin' },
+        { label: 'Analytics' }
+      ]}
+      actions={
+        <div className="flex gap-2">
+          <Select value={timeRange} onValueChange={(value) => setTimeRange(value as '7' | '30' | '90')}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="90">Last 90 days</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={() => exportData(revenueData, 'analytics')}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      }
+    >
+      <div className="space-y-6">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
@@ -178,14 +171,14 @@ export default function Analytics() {
         ) : (
           <>
             {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="border-0 shadow-sm">
                 <CardHeader className="pb-3">
                   <CardDescription className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
                     Total Revenue
                   </CardDescription>
-                  <CardTitle className="text-3xl">
+                  <CardTitle className="text-3xl font-bold">
                     {formatCurrency(platformStats?.totalRevenue || 0)}
                   </CardTitle>
                   <div className="flex items-center gap-1 text-sm">
@@ -256,7 +249,7 @@ export default function Analytics() {
                   </CardDescription>
                   <CardTitle className="text-3xl">{platformStats?.totalUsers || 0}</CardTitle>
                   <p className="text-sm text-neutral-600">
-                    Conversion: {platformStats?.conversionRate.toFixed(1)}%
+                    Conversion: {(platformStats?.conversionRate ?? 0).toFixed(1)}%
                   </p>
                 </CardHeader>
               </Card>
@@ -289,7 +282,7 @@ export default function Analytics() {
                         <XAxis dataKey="date" tickFormatter={formatDate} />
                         <YAxis />
                         <Tooltip
-                          formatter={(value: any, name: string) =>
+                          formatter={(value: number, name: string) =>
                             name === 'revenue' ? formatCurrency(value) : value
                           }
                           labelFormatter={(label) => formatDate(label)}
@@ -438,11 +431,10 @@ export default function Analytics() {
                             <div
                               className="bg-primary-500 h-2 rounded-full"
                               style={{
-                                width: `${
-                                  (service.count /
-                                    Math.max(...serviceAnalytics.map((s) => s.count))) *
+                                width: `${(service.count /
+                                  Math.max(...serviceAnalytics.map((s) => s.count))) *
                                   100
-                                }%`,
+                                  }%`,
                               }}
                             />
                           </div>
@@ -455,7 +447,7 @@ export default function Analytics() {
             </div>
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </AdminLayout>
   );
 }

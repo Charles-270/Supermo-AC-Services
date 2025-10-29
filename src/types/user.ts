@@ -4,7 +4,7 @@
  */
 
 import { Timestamp } from 'firebase/firestore';
-import type { TechnicianMetadata } from './technician';
+import type { Certification } from './technician';
 
 /**
  * User Roles
@@ -16,6 +16,43 @@ export type UserRole = 'customer' | 'technician' | 'supplier' | 'admin' | 'train
  * User Profile Interface
  * Stored in Firestore 'users' collection
  */
+export interface UserMetadata {
+  // Customer-specific
+  address?: string;
+  preferredPaymentMethod?: 'cash' | 'momo' | 'card';
+
+  // Technician-specific
+  specialization?: string[];
+  certifications?: string[] | Certification[];
+  availability?: 'available' | 'busy' | 'offline';
+
+  // Supplier-specific
+  companyName?: string;
+  businessName?: string;
+  businessRegNumber?: string;
+  productCategories?: string[];
+  warehouseLocation?: string;
+  deliveryCapacityPerDay?: number | null;
+  fulfillmentRegions?: string[];
+  fulfillmentLeadTimeDays?: number | null;
+  serviceRadiusKm?: number | null;
+  contactEmail?: string;
+  contactPhone?: string;
+  notes?: string;
+
+  // Admin-specific
+  permissions?: string[];
+  department?: string;
+
+  // Trainee-specific
+  enrolledCourses?: string[];
+  completedCourses?: string[];
+  certificationProgress?: number;
+
+  // Generic catch-all to support incremental metadata without type churn
+  [key: string]: unknown;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -25,30 +62,7 @@ export interface UserProfile {
   photoURL?: string;
 
   // Role-specific metadata
-  metadata: {
-    // Customer-specific
-    address?: string;
-    preferredPaymentMethod?: 'cash' | 'momo' | 'card';
-
-    // Technician-specific
-    specialization?: string[];
-    certifications?: string[];
-    availability?: 'available' | 'busy' | 'offline';
-
-    // Supplier-specific
-    companyName?: string;
-    businessRegNumber?: string;
-    productCategories?: string[];
-
-    // Admin-specific
-    permissions?: string[];
-    department?: string;
-
-    // Trainee-specific
-    enrolledCourses?: string[];
-    completedCourses?: string[];
-    certificationProgress?: number;
-  };
+  metadata: UserMetadata;
 
   // Timestamps
   createdAt: Timestamp;

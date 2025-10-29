@@ -3,7 +3,7 @@
  * Browse products with search, filters, and pagination
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,15 +31,11 @@ export function ProductCatalog() {
     category: (searchParams.get('category') as ProductCategory) || undefined,
     searchQuery: searchParams.get('q') || undefined,
     brand: searchParams.get('brand') || undefined,
-    sortBy: (searchParams.get('sort') as any) || 'newest',
+    sortBy: (searchParams.get('sort') as 'newest' | 'popular' | 'price-asc' | 'price-desc' | 'name-asc' | 'name-desc') || 'newest',
     inStock: searchParams.get('inStock') === 'true',
   });
 
-  useEffect(() => {
-    fetchProducts();
-  }, [filters]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       const { products: fetchedProducts } = await getProducts(filters, 50);
@@ -49,7 +45,11 @@ export function ProductCatalog() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const handleSearchChange = (value: string) => {
     setFilters((prev) => ({ ...prev, searchQuery: value || undefined }));
@@ -84,7 +84,7 @@ export function ProductCatalog() {
   };
 
   const handleSortChange = (value: string) => {
-    setFilters((prev) => ({ ...prev, sortBy: value as any }));
+    setFilters((prev) => ({ ...prev, sortBy: value as 'newest' | 'popular' | 'price-asc' | 'price-desc' | 'name-asc' | 'name-desc' }));
     searchParams.set('sort', value);
     setSearchParams(searchParams);
   };

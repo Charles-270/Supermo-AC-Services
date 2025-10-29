@@ -11,12 +11,34 @@ import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag, Package } from 'lucide-rea
 import { useCart } from '@/hooks/useCart';
 import { formatCurrency } from '@/lib/utils';
 import { INSTALLATION_FEES, SHIPPING_FEES } from '@/types/product';
+import {
+  PLATFORM_MAINTENANCE_FEE_RATE,
+  PLATFORM_SERVICE_FEE_RATE,
+  currencyRound,
+  resolveProductPricing,
+} from '@/utils/pricing';
 
 export function Cart() {
   const navigate = useNavigate();
-  const { cart, removeFromCart, updateQuantity, getCartTotal, clearCart } = useCart();
+  const { cart, removeFromCart, updateQuantity, clearCart } = useCart();
+  const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const itemsTotal = getCartTotal();
+  const feeTotals = cart.reduce(
+    (acc, item) => {
+      const pricing = resolveProductPricing(item.product);
+      acc.base += pricing.basePrice * item.quantity;
+      acc.service += pricing.serviceFee * item.quantity;
+      acc.maintenance += pricing.maintenanceFee * item.quantity;
+      acc.total += pricing.totalPrice * item.quantity;
+      return acc;
+    },
+    { base: 0, service: 0, maintenance: 0, total: 0 }
+  );
+
+  const supplierSubtotal = currencyRound(feeTotals.base);
+  const serviceFeeTotal = currencyRound(feeTotals.service);
+  const maintenanceFeeTotal = currencyRound(feeTotals.maintenance);
+  const itemsTotal = currencyRound(feeTotals.total);
 
   // Calculate installation fees
   const installationFees = cart.reduce((total, item) => {
@@ -30,7 +52,11 @@ export function Cart() {
   // Default shipping (Greater Accra)
   const shippingFee = SHIPPING_FEES['Greater Accra'];
 
-  const grandTotal = itemsTotal + installationFees + shippingFee;
+  const grandTotal = currencyRound(itemsTotal + installationFees + shippingFee);
+  const serviceFeeLabel = `Service fee (${Math.round(PLATFORM_SERVICE_FEE_RATE * 100)}%)`;
+  const maintenanceFeeLabel = `Maintenance fee (${Math.round(
+    PLATFORM_MAINTENANCE_FEE_RATE * 100
+  )}%)`;
 
   const handleCheckout = () => {
     navigate('/checkout');
@@ -100,8 +126,10 @@ export function Cart() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {cart.map((item) => (
-              <Card key={item.product.id}>
+            {cart.map((item) => {
+              const pricing = resolveProductPricing(item.product);
+              return (
+                <Card key={item.product.id}>
                 <CardContent className="p-4">
                   <div className="flex gap-4">
                     {/* Product Image */}
@@ -134,7 +162,7 @@ export function Cart() {
                               ` • ${item.product.specifications.capacity}`}
                           </p>
                           <p className="text-lg font-semibold text-primary-600 mt-2">
-                            {formatCurrency(item.product.price)}
+                            {formatCurrency(pricing.totalPrice)}
                           </p>
                         </div>
                         <Button
@@ -187,14 +215,15 @@ export function Cart() {
                       <div className="mt-3 flex justify-between items-center">
                         <span className="text-sm text-neutral-600">Item Total:</span>
                         <span className="text-lg font-semibold text-neutral-900">
-                          {formatCurrency(item.product.price * item.quantity)}
+                          {formatCurrency(pricing.totalPrice * item.quantity)}
                         </span>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
 
           {/* Order Summary */}
@@ -204,10 +233,22 @@ export function Cart() {
                 <CardTitle>Order Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Items Total */}
+                {/* Pricing Breakdown */}
                 <div className="flex justify-between text-sm">
+                  <span className="text-neutral-600">Supplier subtotal</span>
+                  <span className="font-medium">{formatCurrency(supplierSubtotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-neutral-600">{serviceFeeLabel}</span>
+                  <span className="font-medium">{formatCurrency(serviceFeeTotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-neutral-600">{maintenanceFeeLabel}</span>
+                  <span className="font-medium">{formatCurrency(maintenanceFeeTotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm pt-2">
                   <span className="text-neutral-600">
-                    Items ({cart.reduce((sum, item) => sum + item.quantity, 0)})
+                    Items ({totalQuantity})
                   </span>
                   <span className="font-medium">{formatCurrency(itemsTotal)}</span>
                 </div>

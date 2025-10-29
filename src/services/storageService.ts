@@ -15,7 +15,7 @@ import { storage } from '@/lib/firebase';
  * Compress image before upload
  * Reduces file size for faster uploads on 3G/4G networks
  */
-async function compressImage(file: File, maxSizeMB: number = 1): Promise<File> {
+async function compressImage(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -197,6 +197,60 @@ export async function uploadMultiplePhotos(
     console.error('Error uploading multiple photos:', error);
     throw new Error('Failed to upload photos');
   }
+}
+
+export async function uploadSupplierCatalogImage(
+  file: File,
+  supplierId: string,
+  onProgress?: (progress: number) => void
+): Promise<string> {
+  try {
+    if (!file.type.startsWith('image/')) {
+      throw new Error('Only image files are allowed');
+    }
+
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error('File size exceeds 10MB limit');
+    }
+
+    const compressedFile = await compressImage(file);
+    const timestamp = Date.now();
+    const fileName = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const storageRef = ref(
+      storage,
+      `supplier_catalog_requests/${supplierId}/${fileName}`
+    );
+
+    const uploadTask = uploadBytesResumable(storageRef, compressedFile);
+
+    return new Promise((resolve, reject) => {
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          if (onProgress) {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            onProgress(Math.round(progress));
+          }
+        },
+        (error) => {
+          console.error('Upload error:', error);
+          reject(new Error('Failed to upload photo'));
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(downloadURL);
+        }
+      );
+    });
+  } catch (error) {
+    console.error('Error uploading supplier catalog image:', error);
+    throw error;
+  }
+}
+
+export async function deleteSupplierCatalogImage(photoUrl: string): Promise<void> {
+  await deleteJobPhoto(photoUrl);
 }
 
 /**

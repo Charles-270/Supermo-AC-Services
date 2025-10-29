@@ -266,7 +266,7 @@ export interface AssignmentRecommendation {
 export interface CommissionSplit {
   technicianId: string;
   technicianName: string;
-  role: 'lead' | 'senior' | 'technician' | 'junior' | 'trainee';
+  role: 'lead' | 'senior' | 'technician' | 'junior' | 'trainee' | 'apprentice';
   percentage: number;
   amount: number;
 }
@@ -280,6 +280,7 @@ export const DEFAULT_COMMISSION_RATES: Record<string, number> = {
   technician: 0.25, // 25% for regular techs
   junior: 0.20,     // 20% for junior techs
   trainee: 0.10,    // 10% for trainees
+  apprentice: 0.12, // 12% for apprentices
 };
 
 /**
@@ -343,7 +344,7 @@ export function calculateTeamEarnings(
     return {
       technicianId: '',
       technicianName: '',
-      role: member.role as any,
+      role: member.role as 'lead' | 'senior' | 'technician' | 'junior' | 'trainee' | 'apprentice',
       percentage,
       amount,
     };

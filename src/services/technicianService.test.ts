@@ -1,6 +1,9 @@
+import { Timestamp } from 'firebase/firestore';
 import { describe, it, expect } from 'vitest';
 import type { TechnicianProfile } from '@/services/technicianService';
 import { calculateMatchScore } from '@/services/technicianService';
+
+const now = Timestamp.fromDate(new Date());
 
 const baseTechnician: TechnicianProfile = {
   uid: 'tech-123',
@@ -10,6 +13,7 @@ const baseTechnician: TechnicianProfile = {
   metadata: {
     skills: ['ac_installation', 'electrical'],
     serviceAreas: ['Accra', 'Tema'],
+    hireDate: now,
     availabilityStatus: 'available',
     currentJobIds: [],
     maxJobsPerDay: 6,
@@ -18,15 +22,23 @@ const baseTechnician: TechnicianProfile = {
     certifications: [],
     primarySpecialization: 'ac_installation',
     isTeamLead: false,
+    canWorkAlone: true,
     totalJobsCompleted: 40,
     totalJobsAssigned: 50,
     averageRating: 4.8,
     firstTimeFixRate: 92,
     averageJobDuration: 2.5,
     hasVehicle: true,
+    vehicleType: 'van',
     hasToolKit: true,
     isEmergencyTechnician: false,
+    emergencyContactNumber: '+233555000000',
   },
+  isActive: true,
+  isEmailVerified: true,
+  isApproved: true,
+  createdAt: now,
+  updatedAt: now,
 };
 
 describe('calculateMatchScore', () => {

@@ -3,8 +3,8 @@
  * Dropdown for selecting technicians with smart assignment recommendations
  */
 
-import { useState, useEffect } from 'react';
-import { Search, User, Loader2, CheckCircle2, AlertCircle, Users } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, User, Loader2, CheckCircle2, Users } from 'lucide-react';
 import {
   getAllTechnicians,
   getAvailableTechnicians,
@@ -53,17 +53,7 @@ export function TechnicianSelector({
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'dropdown' | 'list'>('dropdown');
 
-  useEffect(() => {
-    loadTechnicians();
-  }, [showOnlyAvailable]);
-
-  useEffect(() => {
-    if (showRecommendations && requiredSkills.length > 0 && serviceArea) {
-      loadRecommendations();
-    }
-  }, [requiredSkills, serviceArea, jobComplexity, showRecommendations]);
-
-  const loadTechnicians = async () => {
+  const loadTechnicians = useCallback(async () => {
     try {
       setLoading(true);
       const data = showOnlyAvailable
@@ -75,9 +65,9 @@ export function TechnicianSelector({
     } finally {
       setLoading(false);
     }
-  };
+  }, [showOnlyAvailable]);
 
-  const loadRecommendations = async () => {
+  const loadRecommendations = useCallback(async () => {
     try {
       const recs = await getAssignmentRecommendations(
         requiredSkills,
@@ -89,7 +79,17 @@ export function TechnicianSelector({
     } catch (error) {
       console.error('Error loading recommendations:', error);
     }
-  };
+  }, [requiredSkills, serviceArea, jobComplexity]);
+
+  useEffect(() => {
+    loadTechnicians();
+  }, [loadTechnicians]);
+
+  useEffect(() => {
+    if (showRecommendations && requiredSkills.length > 0 && serviceArea) {
+      loadRecommendations();
+    }
+  }, [showRecommendations, requiredSkills.length, serviceArea, loadRecommendations]);
 
   const filteredTechnicians = technicians.filter((tech) => {
     if (!searchTerm) return true;

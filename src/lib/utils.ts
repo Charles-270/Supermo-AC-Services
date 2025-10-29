@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import type { Timestamp } from 'firebase/firestore'
 
 /**
  * Utility function to merge Tailwind CSS classes
@@ -11,6 +12,21 @@ import { twMerge } from "tailwind-merge"
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+type DateLike = Date | string | number | Timestamp | { toDate: () => Date } | null | undefined
+
+export function resolveDate(value: DateLike): Date | null {
+  if (!value && value !== 0) return null
+  if (value instanceof Date) return value
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof value.toDate === 'function') {
+    return value.toDate()
+  }
+  return null
 }
 
 /**
@@ -33,13 +49,14 @@ export function formatCurrency(amount: number): string {
  * @example
  * formatDate(new Date()) // Returns "02/10/2025" (DD/MM/YYYY)
  */
-export function formatDate(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date
+export function formatDate(date: DateLike): string {
+  const d = resolveDate(date)
+  if (!d) return 'N/A'
   return new Intl.DateTimeFormat('en-GB', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
-  }).format(d)
+}).format(d)
 }
 
 /**
@@ -48,15 +65,16 @@ export function formatDate(date: Date | string): string {
  * @example
  * formatDateTime(new Date()) // Returns "02/10/2025, 14:30"
  */
-export function formatDateTime(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date
+export function formatDateTime(date: DateLike): string {
+  const d = resolveDate(date)
+  if (!d) return 'N/A'
   return new Intl.DateTimeFormat('en-GB', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(d)
+}).format(d)
 }
 
 /**
@@ -77,7 +95,7 @@ export function truncate(text: string, maxLength: number): string {
  * @example
  * const debouncedSearch = debounce((query) => searchAPI(query), 300)
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: never[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {

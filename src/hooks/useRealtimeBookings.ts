@@ -173,7 +173,6 @@ export function useRealtimeBookingCounts(userId?: string, userRole?: string) {
     }
 
     const bookingsCollection = collection(db, 'bookings');
-    let baseQuery = bookingsCollection;
 
     // Build query based on user role
     const constraints: QueryConstraint[] = [];
@@ -186,7 +185,7 @@ export function useRealtimeBookingCounts(userId?: string, userRole?: string) {
     // Admin sees all bookings, no filter needed
 
     const bookingsQuery =
-      constraints.length > 0 ? query(baseQuery, ...constraints) : baseQuery;
+      constraints.length > 0 ? query(bookingsCollection, ...constraints) : bookingsCollection;
 
     const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
       const newCounts = {

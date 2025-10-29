@@ -43,22 +43,39 @@ export function useAdminStats(): AdminStats {
       const activeBookingsSnapshot = await getDocs(activeBookingsQuery);
       const activeBookings = activeBookingsSnapshot.size;
 
-      // Calculate total revenue from completed bookings
+      // Calculate total revenue from BOTH bookings AND e-commerce orders
+      
+      // 1. Revenue from completed bookings (technician services)
       const completedBookingsQuery = query(
         bookingsRef,
         where('status', '==', 'completed')
       );
       const completedBookingsSnapshot = await getDocs(completedBookingsQuery);
 
-      let totalRevenue = 0;
+      let bookingRevenue = 0;
       completedBookingsSnapshot.forEach((doc) => {
         const booking = doc.data();
-        if (booking.finalCost) {
-          totalRevenue += booking.finalCost;
-        } else if (booking.estimatedCost) {
-          totalRevenue += booking.estimatedCost;
-        }
+        // Use finalCost if available, otherwise agreedPrice or estimatedCost
+        const revenue = booking.finalCost || booking.agreedPrice || booking.estimatedCost || 0;
+        bookingRevenue += revenue;
       });
+
+      // 2. Revenue from paid e-commerce orders
+      const ordersRef = collection(db, 'orders');
+      const paidOrdersQuery = query(
+        ordersRef,
+        where('paymentStatus', '==', 'paid')
+      );
+      const paidOrdersSnapshot = await getDocs(paidOrdersQuery);
+
+      let ecommerceRevenue = 0;
+      paidOrdersSnapshot.forEach((doc) => {
+        const order = doc.data();
+        ecommerceRevenue += order.totalAmount || 0;
+      });
+
+      // Combine both revenue sources
+      const totalRevenue = bookingRevenue + ecommerceRevenue;
 
       // Calculate average response time (time from booking creation to assignment)
       let totalResponseTime = 0;

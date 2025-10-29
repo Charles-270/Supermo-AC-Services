@@ -1,77 +1,118 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons&display=swap');
+@import './styles/design-tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Root Variables - HVAC Theme */
-:root {
-  --primary: 14 165 233; /* #0EA5E9 - Sky Blue */
-  --primary-dark: 2 132 199; /* #0284C7 */
-  --accent: 6 182 212; /* #06B6D4 - Cyan */
-  --success: 16 185 129; /* #10B981 */
-  --warning: 245 158 11; /* #F59E0B */
-  --error: 239 68 68; /* #EF4444 */
-  --neutral: 100 116 139; /* #64748B */
+/* Accessibility & Mobile Enhancements */
 
-  /* Typography */
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  /* Rendering optimizations */
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
+/* Focus visible styles for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-/* Base Styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Remove default focus for mouse users */
+*:focus:not(:focus-visible) {
+  outline: none;
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  background-color: theme('colors.neutral.50');
-  color: theme('colors.neutral.900');
-}
-
-/* Mobile-First Responsive Base */
-@media (max-width: 640px) {
+/* Safe area insets for notched devices */
+@supports (padding: max(0px)) {
   body {
-    font-size: 14px;
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+  }
+  
+  .safe-top {
+    padding-top: max(0px, env(safe-area-inset-top));
+  }
+  
+  .safe-bottom {
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
   }
 }
 
-/* Custom Utilities for HVAC Platform */
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* Minimum touch target size (44x44px) */
+button,
+a,
+input[type="checkbox"],
+input[type="radio"],
+select {
+  min-height: 44px;
+  min-width: 44px;
+}
 
-  .bg-gradient-primary {
-    background: linear-gradient(135deg, #0EA5E9 0%, #06B6D4 100%);
-  }
+/* Exception for small buttons with explicit size */
+button.btn-sm,
+.btn-sm {
+  min-height: 36px;
+  min-width: 36px;
+}
 
-  .bg-gradient-cool {
-    background: linear-gradient(180deg, #F0F9FF 0%, #E0F2FE 100%);
+/* Improve tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Skip to main content link */
+.skip-to-main {
+  position: absolute;
+  left: -9999px;
+  z-index: 999;
+  padding: 1rem;
+  background-color: hsl(var(--primary));
+  color: white;
+  text-decoration: none;
+}
+
+.skip-to-main:focus {
+  left: 50%;
+  transform: translateX(-50%);
+  top: 1rem;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
-/* Component Patterns */
-@layer components {
-  .btn-primary {
-    @apply bg-primary-500 text-white px-4 py-2 rounded-md hover:bg-primary-600 transition-colors;
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  * {
+    border-color: currentColor;
   }
+  
+  button,
+  a {
+    text-decoration: underline;
+  }
+}
 
-  .card {
-    @apply bg-white rounded-lg shadow-md p-6 border border-neutral-200;
-  }
-
-  .input-field {
-    @apply w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500;
-  }
+/* Dark mode support (if needed in future) */
+@media (prefers-color-scheme: dark) {
+  /* Placeholder for dark mode styles */
 }

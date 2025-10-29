@@ -4,6 +4,7 @@
 
 import type { Order } from '@/types/product';
 import { toast } from '@/components/ui/use-toast';
+import { resolveDate } from '@/lib/utils';
 
 /**
  * Convert orders data to CSV format
@@ -42,7 +43,7 @@ export function exportOrdersToCSV(orders: Order[], filename = 'orders.csv') {
 
   // Convert orders to CSV rows
   const rows = orders.map((order) => {
-    const createdDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
+    const createdDate = resolveDate(order.createdAt) ?? new Date(0);
 
     return [
       order.orderNumber,
@@ -114,10 +115,10 @@ export function exportDetailedOrdersToCSV(orders: Order[], filename = 'orders-de
   ];
 
   // Convert orders to CSV rows (one row per line item)
-  const rows: any[] = [];
+  const rows: (string | number)[][] = [];
 
   orders.forEach((order) => {
-    const createdDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
+    const createdDate = resolveDate(order.createdAt) ?? new Date(0);
 
     order.items.forEach((item) => {
       rows.push([
@@ -139,7 +140,7 @@ export function exportDetailedOrdersToCSV(orders: Order[], filename = 'orders-de
   // Combine headers and rows
   const csvContent = [
     headers.join(','),
-    ...rows.map((row) => row.map((cell: any) => `"${cell}"`).join(',')),
+    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
   ].join('\n');
 
   // Create blob and download

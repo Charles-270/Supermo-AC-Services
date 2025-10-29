@@ -226,6 +226,81 @@ Design for growth:
 
 ---
 
+## Visual Development Guidelines
+
+### Design Principles
+- Reference comprehensive design checklist in `.claude/context/design-principles.md`
+- Follow S-Tier SaaS design standards (inspired by Stripe, Linear, Airbnb)
+- Maintain visual consistency across all 5 user dashboards
+- Ensure accessibility compliance (WCAG 2.1 AA minimum)
+
+### Quick Visual Verification Process
+After implementing front-end changes:
+1. **Identify modified components** - Review changed files
+2. **Navigate to affected pages** - Start dev server and test live
+3. **Verify design compliance** - Check against design principles
+4. **Validate feature implementation** - Ensure all interactions work
+5. **Check acceptance criteria** - Confirm requirements are met
+6. **Capture screenshots** - Desktop (1440px) and mobile (375px) viewports
+7. **Check for console errors** - Ensure no JavaScript errors
+
+### Design Review Workflows
+
+#### Using the Design Review Agent
+Use `@design-review` agent for:
+- **Significant UI/UX features** - Major component additions or redesigns
+- **Pre-PR visual validation** - Before creating pull requests
+- **Comprehensive accessibility testing** - Full WCAG compliance check
+- **Multi-viewport testing** - Responsive design verification
+
+Example:
+```
+@design-review Please review the new booking form component
+```
+
+#### Using the Design Review Slash Command
+Use `/design-review` command for:
+- **Quick design checks** - Fast verification of current branch changes
+- **On-demand reviews** - User-initiated design audits
+- **Pre-deployment checks** - Final visual QA before deployment
+
+Example:
+```
+/design-review
+```
+
+### Browser Testing with Chrome MCP
+The design review workflows use Chrome DevTools MCP for:
+- **Live environment testing** - Navigate and interact with running app
+- **Screenshot capture** - Visual documentation at multiple viewports
+- **Console monitoring** - Detect JavaScript errors
+- **Network inspection** - Verify API calls and performance
+- **Responsive testing** - Test at mobile, tablet, and desktop sizes
+
+#### Setup & Troubleshooting
+- Ensure Chrome runs with remote debugging enabled on port `9222`:
+  - PowerShell: `powershell -ExecutionPolicy Bypass -File scripts/launch-chrome-debug.ps1`
+  - CMD: `scripts\launch-chrome-debug.bat`
+- Verify prerequisites and connectivity:
+  - PowerShell: `powershell -ExecutionPolicy Bypass -File scripts/check-chrome-mcp.ps1`
+  - CMD: `scripts\check-chrome-mcp.bat`
+- MCP server configuration lives in `mcp.json` (repo root). It starts the Chrome server via `npx chrome-devtools-mcp@latest --chrome-port 9222`.
+- Common issues:
+  - Node/npx not installed in your Windows environment (install Node.js LTS, then restart Claude/VS Code).
+  - Chrome not launched with `--remote-debugging-port=9222` (use the provided launch scripts).
+  - Port 9222 blocked or in-use (close running Chrome and re-launch with scripts).
+  - Wrong config location (use the `mcp.json` in this repo; if using another tool, ensure it points to the same config).
+
+### Design System Compliance
+Ensure all UI changes adhere to:
+- **Color palette** - Use design system colors only
+- **Typography scale** - Follow defined font sizes and weights
+- **Spacing system** - Use consistent spacing (4px/8px increments)
+- **Component library** - Leverage existing ShadCN UI components
+- **Interaction patterns** - Maintain consistent hover/focus/active states
+
+---
+
 ## Specific Learning Goals
 
 As you assist with this project, please help me understand:

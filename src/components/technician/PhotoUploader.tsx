@@ -86,7 +86,7 @@ export function PhotoUploader({
       const updatedPhotos = photos.filter((_, i) => i !== index);
       setPhotos(updatedPhotos);
       onPhotosChange(updatedPhotos);
-    } catch (err) {
+    } catch {
       setError('Failed to delete photo');
     }
   };

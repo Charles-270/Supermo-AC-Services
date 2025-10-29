@@ -3,15 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    
+    <!-- SEO Meta Tags -->
     <title>Supremo AC Services - HVAC Solutions in Ghana</title>
     <meta name="description" content="Professional AC installation, maintenance, and repair services in Ghana. Shop AC units and spare parts online." />
-
-    <!-- Paystack Payment Gateway -->
-    <script src="https://js.paystack.co/v1/inline.js"></script>
+    <meta name="keywords" content="AC services Ghana, HVAC Ghana, air conditioning installation, AC repair, AC maintenance" />
+    <meta name="theme-color" content="#0ea5e9" />
+    
+    <!-- Performance Optimizations -->
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="dns-prefetch" href="https://lh3.googleusercontent.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- Preload Critical Fonts -->
+    <link rel="preload" href="https://fonts.gstatic.com/s/materialicons/v145/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+    <link rel="preload" href="https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7Z1xlFQ.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+    
+    <!-- Inline Critical CSS for faster FCP -->
+    <style>
+      /* Prevent FOUC (Flash of Unstyled Content) */
+      #root { min-height: 100vh; }
+      body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+      
+      /* Loading spinner */
+      .app-loader {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 48px;
+        height: 48px;
+        border: 4px solid #f3f4f6;
+        border-top-color: #0ea5e9;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: translate(-50%, -50%) rotate(360deg); }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Loading indicator shown until React hydrates -->
+      <div class="app-loader"></div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

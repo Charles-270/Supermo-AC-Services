@@ -13,7 +13,7 @@ export type ProductCategory =
 
 export type ProductCondition = 'new' | 'refurbished';
 
-export type ProductStatus = 'active' | 'out-of-stock' | 'discontinued';
+export type ProductStatus = 'active' | 'low-stock' | 'out-of-stock' | 'discontinued';
 
 export interface ProductSpecification {
   brand?: string;
@@ -28,7 +28,7 @@ export interface ProductSpecification {
   color?: string;
   material?: string;
   compatibility?: string[]; // For spare parts - compatible AC models
-  [key: string]: any; // Allow additional specs
+  [key: string]: string | string[] | undefined; // Allow additional specs
 }
 
 export interface Product {
@@ -67,6 +67,7 @@ export type OrderStatus =
   | 'processing'
   | 'shipped'
   | 'delivered'
+  | 'failed'
   | 'cancelled'
   | 'refunded';
 
@@ -103,6 +104,39 @@ export interface OrderItem {
   installationRequired?: boolean;
   warranty?: string;
   subtotal: number; // price * quantity
+  supplierId?: string;
+  supplierName?: string;
+}
+
+export type SupplierAssignmentStatus =
+  | 'pending'
+  | 'accepted'
+  | 'declined'
+  | 'fulfilled'
+  | 'reassigned';
+
+export interface SupplierAssignmentItem {
+  productId: string;
+  quantity: number;
+  catalogItemId?: string;
+}
+
+export interface SupplierAssignment {
+  supplierId: string;
+  supplierName: string;
+  items: SupplierAssignmentItem[];
+  status: SupplierAssignmentStatus;
+  assignedAt: Timestamp;
+  respondedAt?: Timestamp;
+  notes?: string;
+  autoAssigned?: boolean;
+}
+
+export interface FulfillmentDetails {
+  technicianName?: string;
+  technicianPhone?: string;
+  assignedTime?: Timestamp | Date;
+  notes?: string;
 }
 
 export interface Order {
@@ -115,15 +149,20 @@ export interface Order {
 
   items: OrderItem[];
   itemsTotal: number;
+  subtotal?: number; // Alias for itemsTotal
   shippingFee: number;
+  deliveryFee?: number; // Alias for shippingFee
   installationFee?: number;
   taxAmount?: number;
+  tax?: number; // Alias for taxAmount
   totalAmount: number;
 
   shippingAddress: ShippingAddress;
 
-  paymentMethod: PaymentMethod;
+  paymentMethod: PaymentMethod | string; // Allow string for flexibility
   paymentStatus: PaymentStatus;
+  supplierIds?: string[];
+  supplierAssignments?: SupplierAssignment[];
   paymentReference?: string; // Paystack reference
   paystackAuthUrl?: string;
   paymentGateway?: string;
@@ -135,10 +174,12 @@ export interface Order {
   estimatedDelivery?: Timestamp;
   deliveredAt?: Timestamp;
 
+  fulfillmentDetails?: FulfillmentDetails;
+
   notes?: string;
 
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
   cancelledAt?: Timestamp;
   cancellationReason?: string;
 }
@@ -152,6 +193,60 @@ export interface PaymentTransaction {
   amount?: number;
   paidAt?: string;
   createdAt?: string;
+}
+
+
+export interface SupplierShare {
+  supplierId: string;
+  supplierName?: string;
+  totalAmount: number;
+  platformCommission?: number; // 10% platform fee
+  supplierPayout?: number; // 90% goes to supplier
+}
+
+/**
+ * Platform Commission Structure (Ultra-Simple)
+ * - Flat 10% commission for ALL suppliers
+ * - No tiers, no negotiations
+ * - Supplier gets 90%, platform keeps 10%
+ */
+export const PLATFORM_COMMISSION_RATE = 0.10; // 10% commission
+export const SUPPLIER_PAYOUT_RATE = 0.90; // 90% to supplier
+
+export interface PaymentTransaction {
+  gateway: string;
+  reference: string;
+  status?: string;
+  channel?: string;
+  currency?: string;
+  amount?: number;
+  paidAt?: string;
+  createdAt?: string;
+}
+
+
+export type SupplierCatalogStatus = 'active' | 'pending' | 'inactive' | 'rejected';
+
+export interface SupplierCatalogItem {
+  id: string;
+  supplierId: string;
+  productId?: string;
+  productName: string;
+  category: ProductCategory;
+  price: number;
+  basePrice?: number;
+  stockQuantity: number;
+  status: SupplierCatalogStatus;
+  images?: string[];
+  notes?: string;
+  minimumOrderQuantity?: number;
+  leadTimeDays?: number;
+  deliveryRegions?: string[];
+  restockDate?: Timestamp | null;
+  approvalNotes?: string;
+  platformFeesAppliedAt?: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 // Filter options for product catalog

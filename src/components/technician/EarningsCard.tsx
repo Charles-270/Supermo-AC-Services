@@ -1,95 +1,84 @@
 /**
- * Earnings Card Component
- * Displays technician earnings summary
+ * EarningsCard Component
+ * Mobile-responsive card view for earnings history
+ * Replaces the existing EarningsCard with enhanced accessibility
  */
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, TrendingUp, DollarSign } from 'lucide-react';
-import { getTechnicianEarningsPeriods } from '@/services/earningsService';
-import type { EarningsPeriod } from '@/services/earningsService';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Calendar, Star, DollarSign } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import type { Booking } from '@/types/booking';
+import { SERVICE_TYPE_LABELS } from '@/types/booking';
 
 interface EarningsCardProps {
-  technicianId: string;
+  job: Booking;
+  earnings: number;
 }
 
-export function EarningsCard({ technicianId }: EarningsCardProps) {
-  const [earnings, setEarnings] = useState<EarningsPeriod | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadEarnings();
-  }, [technicianId]);
-
-  const loadEarnings = async () => {
-    try {
-      setLoading(true);
-      const data = await getTechnicianEarningsPeriods(technicianId);
-      setEarnings(data);
-    } catch (err) {
-      console.error('Error loading earnings:', err);
-      setError('Failed to load earnings');
-    } finally {
-      setLoading(false);
-    }
+export function EarningsCard({ job, earnings }: EarningsCardProps) {
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   };
 
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="pt-6 flex items-center justify-center h-48">
-          <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error || !earnings) {
-    return (
-      <Card>
-        <CardContent className="pt-6 text-center">
-          <p className="text-neutral-500">Failed to load earnings</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <Card className="hover:shadow-lg transition-shadow">
-        <CardHeader className="pb-3">
-          <CardDescription className="flex items-center gap-1">
-            <DollarSign className="h-4 w-4" />
-            Today
-          </CardDescription>
-          <CardTitle className="text-3xl text-primary-600">
-            {formatCurrency(earnings.today)}
-          </CardTitle>
-        </CardHeader>
-      </Card>
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-4 space-y-3">
+        {/* Header: Date & Service */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+              <Calendar className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+              <span>{formatDate(job.completedAt)}</span>
+            </div>
+            <h3 className="font-semibold text-base truncate" aria-label={`Service: ${SERVICE_TYPE_LABELS[job.serviceType as keyof typeof SERVICE_TYPE_LABELS]}`}>
+              {SERVICE_TYPE_LABELS[job.serviceType as keyof typeof SERVICE_TYPE_LABELS] || job.serviceType}
+            </h3>
+          </div>
+        </div>
 
-      <Card className="hover:shadow-lg transition-shadow border-primary-200">
-        <CardHeader className="pb-3">
-          <CardDescription className="flex items-center gap-1">
-            <TrendingUp className="h-4 w-4" />
-            This Week
-          </CardDescription>
-          <CardTitle className="text-3xl text-primary-600">
-            {formatCurrency(earnings.thisWeek)}
-          </CardTitle>
-        </CardHeader>
-      </Card>
+        {/* Customer Info */}
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-gray-900 truncate" aria-label={`Customer: ${job.customerName}`}>
+            {job.customerName}
+          </p>
+          <p className="text-xs text-gray-500 truncate">{job.customerPhone}</p>
+          <p className="text-xs text-gray-500">{job.city}</p>
+        </div>
 
-      <Card className="hover:shadow-lg transition-shadow">
-        <CardHeader className="pb-3">
-          <CardDescription>This Month</CardDescription>
-          <CardTitle className="text-3xl text-primary-600">
-            {formatCurrency(earnings.thisMonth)}
-          </CardTitle>
-        </CardHeader>
-      </Card>
-    </div>
+        {/* Rating */}
+        <div className="flex items-center gap-2 pt-2 border-t">
+          {job.customerRating ? (
+            <>
+              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" aria-hidden="true" />
+              <span className="font-medium text-sm" aria-label={`Rating: ${job.customerRating.toFixed(1)} out of 5 stars`}>
+                {job.customerRating.toFixed(1)}
+              </span>
+            </>
+          ) : (
+            <Badge variant="secondary" className="text-xs">No Rating</Badge>
+          )}
+        </div>
+
+        {/* Earnings */}
+        <div className="flex items-center gap-2 pt-2 border-t">
+          <DollarSign className="h-4 w-4 text-green-600" aria-hidden="true" />
+          <div className="flex-1">
+            <p className="font-semibold text-green-600 text-lg" aria-label={`Your earnings: ${formatCurrency(earnings)}`}>
+              {formatCurrency(earnings)}
+            </p>
+            <p className="text-xs text-gray-500">
+              From {formatCurrency(job.finalCost!)}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

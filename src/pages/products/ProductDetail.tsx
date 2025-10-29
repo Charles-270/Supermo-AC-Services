@@ -27,11 +27,12 @@ import { useCart } from '@/hooks/useCart';
 import { formatCurrency } from '@/lib/utils';
 import type { Product } from '@/types/product';
 import { INSTALLATION_FEES } from '@/types/product';
+import { resolveProductPricing } from '@/utils/pricing';
 
 export function ProductDetail() {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
-  const { addToCart, isInCart, cart } = useCart();
+  const { addToCart, isInCart } = useCart();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,18 +111,21 @@ export function ProductDetail() {
     );
   }
 
-  const discountPercentage = product.compareAtPrice
-    ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
-    : 0;
+  const pricing = resolveProductPricing(product);
+  const discountPercentage =
+    typeof product.compareAtPrice === 'number' &&
+    product.compareAtPrice > pricing.totalPrice
+      ? Math.round(
+          ((product.compareAtPrice - pricing.totalPrice) / product.compareAtPrice) * 100
+        )
+      : 0;
 
   const installationFee =
     installationRequired && (product.category === 'split-ac' || product.category === 'central-ac')
       ? INSTALLATION_FEES[product.category]
       : 0;
 
-  const totalPrice = product.price * quantity + installationFee;
-
-  const cartItem = cart.find((item) => item.product.id === product.id);
+  const totalPrice = pricing.totalPrice * quantity + installationFee;
 
   return (
     <div className="min-h-screen bg-gradient-cool">
@@ -227,13 +231,8 @@ export function ProductDetail() {
             <div className="bg-neutral-50 rounded-lg p-4">
               <div className="flex items-baseline gap-3">
                 <span className="text-4xl font-bold text-primary-600">
-                  {formatCurrency(product.price)}
+                  {formatCurrency(pricing.totalPrice)}
                 </span>
-                {product.compareAtPrice && (
-                  <span className="text-xl text-neutral-500 line-through">
-                    {formatCurrency(product.compareAtPrice)}
-                  </span>
-                )}
               </div>
               {installationFee > 0 && (
                 <p className="text-sm text-neutral-600 mt-2">
@@ -316,8 +315,22 @@ export function ProductDetail() {
                   className={`flex-1 ${justAdded ? 'bg-success-500 hover:bg-success-600' : ''}`}
                   onClick={handleAddToCart}
                 >
-                  <ShoppingCart className="h-5 w-5 mr-2" />
-                  {justAdded ? '✓ Added!' : isInCart(product.id) ? 'In Cart' : 'Add'}
+                  {justAdded ? (
+                    <>
+                      <Check className="h-5 w-5 mr-2" />
+                      Added
+                    </>
+                  ) : isInCart(product.id) ? (
+                    <>
+                      <Check className="h-5 w-5 mr-2" />
+                      In Cart
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="h-5 w-5 mr-2" />
+                      Add
+                    </>
+                  )}
                 </Button>
                 <Button
                   size="lg"
@@ -333,7 +346,7 @@ export function ProductDetail() {
               </p>
               {product.stockStatus !== 'active' && (
                 <p className="text-sm text-center text-warning-600 bg-warning-50 py-2 px-4 rounded">
-                  ⚠️ This product is currently out of stock but you can still place an order
+                  ?? This product is currently out of stock but you can still place an order
                 </p>
               )}
             </div>

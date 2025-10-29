@@ -16,5 +16,12 @@
     "ui": "@/components/ui",
     "lib": "@/lib",
     "hooks": "@/hooks"
+  },
+  "registries": {
+    "@aceternity": "https://ui.aceternity.com/registry/{name}.json",
+    "@magicui": "https://magicui.design/registry/{name}.json",
+    "@cult": "https://cult-ui.com/r/{name}.json",
+    "@elobar": "https://www.elobar-ui.com/r/{name}.json",
+    "@proul": "https://reui.io/r/{name}.json"
   }
 }

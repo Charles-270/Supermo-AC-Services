@@ -18,7 +18,7 @@ export interface PaystackPaymentData {
     customerId?: string;
     orderId?: string;
     customerName?: string;
-    [key: string]: any;
+    [key: string]: string | number | boolean | undefined;
   };
   channels?: string[]; // 'card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'
 }
@@ -34,17 +34,20 @@ export interface PaystackResponse {
 
 /**
  * Initialize Paystack popup payment
+ * Automatically loads Paystack script if not already loaded (on-demand)
  */
-export function initializePaystackPayment(
+export async function initializePaystackPayment(
   paymentData: PaystackPaymentData,
   onSuccess: (response: PaystackResponse) => void,
   onClose: () => void
-): void {
-  // Check if Paystack script is loaded
-  if (typeof window === 'undefined' || !(window as any).PaystackPop) {
-    console.error('Paystack script not loaded');
-    return;
-  }
+): Promise<void> {
+  try {
+    // Load Paystack script on-demand if not already loaded
+    if (typeof window === 'undefined' || !(window as unknown as { PaystackPop?: unknown }).PaystackPop) {
+      console.log('📦 Loading Paystack script on-demand...');
+      await loadPaystackScript();
+      console.log('✅ Paystack script loaded successfully');
+    }
 
   console.log('Initializing Paystack payment with:', {
     key: PAYSTACK_PUBLIC_KEY,
@@ -56,7 +59,23 @@ export function initializePaystackPayment(
     channels: paymentData.channels || ['card', 'mobile_money', 'bank_transfer'],
   });
 
-  const handler = (window as any).PaystackPop.setup({
+  const PaystackPop = (window as unknown as {
+    PaystackPop: {
+      setup: (config: {
+        key: string;
+        email: string;
+        amount: number;
+        currency: string;
+        ref: string;
+        metadata: Record<string, string | number | boolean | undefined>;
+        channels: string[];
+        onClose: () => void;
+        callback: (response: PaystackResponse) => void;
+      }) => { openIframe: () => void };
+    };
+  }).PaystackPop;
+
+  const handler = PaystackPop.setup({
     key: PAYSTACK_PUBLIC_KEY,
     email: paymentData.email,
     amount: paymentData.amount,
@@ -75,6 +94,11 @@ export function initializePaystackPayment(
   });
 
   handler.openIframe();
+  } catch (error) {
+    console.error('Error initializing Paystack payment:', error);
+    alert('Failed to initialize payment. Please try again.');
+    onClose();
+  }
 }
 
 /**
@@ -130,7 +154,7 @@ export async function verifyPayment(orderId: string, reference: string): Promise
  */
 export function loadPaystackScript(): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (typeof window !== 'undefined' && (window as any).PaystackPop) {
+    if (typeof window !== 'undefined' && (window as unknown as { PaystackPop?: unknown }).PaystackPop) {
       resolve();
       return;
     }

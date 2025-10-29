@@ -1,11 +1,12 @@
 /**
- * Platform Settings Page
+ * Platform Settings Page - Redesigned
  * Admin interface for configuring platform settings
+ * Google Stitch-inspired design - October 2025
  */
 
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,14 +14,6 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  ArrowLeft,
   Save,
   Loader2,
   RefreshCw,
@@ -30,7 +23,7 @@ import {
   CreditCard,
   Bell,
   Settings as SettingsIcon,
-  Clock,
+  DollarSign,
 } from 'lucide-react';
 import {
   getSettings,
@@ -41,12 +34,12 @@ import {
   updateSystemSettings,
   setMaintenanceMode,
 } from '@/services/settingsService';
-import type { PlatformSettings, ServiceType } from '@/types/settings';
+import type { PlatformSettings } from '@/types/settings';
 import { toast } from '@/components/ui/use-toast';
+import { ServicePricingEditor } from '@/components/admin/ServicePricingEditor';
 
 export default function PlatformSettings() {
   const { profile } = useAuth();
-  const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
@@ -66,7 +59,7 @@ export default function PlatformSettings() {
     setLoading(true);
     try {
       const data = await getSettings();
-      setSettings(data);
+      // Populate individual form states
       setGeneralForm(data.general);
       setServiceForm(data.service);
       setPaymentForm(data.payment);
@@ -227,41 +220,40 @@ export default function PlatformSettings() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-      </div>
+      <AdminLayout
+        title="Platform Settings"
+        subtitle="Configure your platform settings"
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard/admin' },
+          { label: 'Settings' }
+        ]}
+      >
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-cool">
-      {/* Header */}
-      <header className="bg-white border-b border-neutral-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard/admin">
-                <Button variant="ghost" size="icon">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-neutral-900">Platform Settings</h1>
-                <p className="text-sm text-neutral-600">Configure your platform settings</p>
-              </div>
-            </div>
-            <Button variant="outline" onClick={loadSettings} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Reload
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <AdminLayout
+      title="Platform Settings"
+      subtitle="Configure your platform settings"
+      breadcrumbs={[
+        { label: 'Dashboard', href: '/dashboard/admin' },
+        { label: 'Settings' }
+      ]}
+      actions={
+        <Button variant="outline" size="sm" onClick={loadSettings} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Reload
+        </Button>
+      }
+    >
+      <div className="space-y-6">
         {/* Maintenance Mode Warning */}
         {systemForm?.maintenanceMode && (
-          <Card className="mb-6 border-amber-500 bg-amber-50">
+          <Card className="border-amber-500 bg-amber-50/50 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-amber-900">
                 <AlertTriangle className="h-5 w-5" />
@@ -279,11 +271,17 @@ export default function PlatformSettings() {
           </Card>
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+              <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="general">
               <Building2 className="h-4 w-4 mr-2" />
               General
+            </TabsTrigger>
+            <TabsTrigger value="pricing">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Pricing
             </TabsTrigger>
             <TabsTrigger value="service">
               <Wrench className="h-4 w-4 mr-2" />
@@ -513,6 +511,11 @@ export default function PlatformSettings() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Service Pricing Tab */}
+          <TabsContent value="pricing" className="space-y-6">
+            <ServicePricingEditor />
           </TabsContent>
 
           {/* Service Settings Tab */}
@@ -978,8 +981,10 @@ export default function PlatformSettings() {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
-      </main>
-    </div>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+    </AdminLayout>
   );
 }

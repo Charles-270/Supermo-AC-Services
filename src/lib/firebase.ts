@@ -3,7 +3,7 @@ import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
-import { getAnalytics } from 'firebase/analytics';
+import type { Analytics } from 'firebase/analytics';
 
 /**
  * Firebase Configuration
@@ -38,13 +38,54 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app, 'europe-west1'); // Closest region to Ghana
-export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 /**
- * Connect to Firebase Emulators in Development
- * Uncomment to use local emulators
+ * Lazy-loaded Firebase Analytics
+ *
+ * Why lazy load?
+ * - Analytics is NOT critical for initial page render
+ * - Loading synchronously blocks LCP by 2-3 seconds
+ * - Users don't see/need analytics data immediately
+ *
+ * Call initAnalytics() after your page renders, typically in a useEffect:
+ *
+ * useEffect(() => {
+ *   initAnalytics(); // Non-blocking, loads in background
+ * }, []);
  */
-if (import.meta.env.DEV && false) { // Set to true when using emulators
+let analyticsInstance: Analytics | null = null;
+
+export const initAnalytics = async (): Promise<Analytics | null> => {
+  // Only load in browser (not during SSR)
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  // Return cached instance if already loaded
+  if (analyticsInstance) {
+    return analyticsInstance;
+  }
+
+  try {
+    // Dynamically import analytics module (code-split)
+    const { getAnalytics } = await import('firebase/analytics');
+    analyticsInstance = getAnalytics(app);
+    console.log('📊 Firebase Analytics initialized (lazy-loaded)');
+    return analyticsInstance;
+  } catch (error) {
+    console.error('❌ Failed to initialize Firebase Analytics:', error);
+    return null;
+  }
+};
+
+// Getter for analytics instance (use after initAnalytics() has been called)
+export const getAnalyticsInstance = (): Analytics | null => analyticsInstance;
+
+/**
+ * Connect to Firebase emulators when explicitly enabled.
+ * Toggle via VITE_USE_FIREBASE_EMULATORS=true in .env.*.
+ */
+if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true') {
   connectAuthEmulator(auth, 'http://localhost:9099');
   connectFirestoreEmulator(db, 'localhost', 8080);
   connectStorageEmulator(storage, 'localhost', 9199);

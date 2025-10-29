@@ -10,7 +10,7 @@ import { collection, getDocs, deleteDoc, doc, query, orderBy } from 'firebase/fi
 interface ProductData {
   id: string;
   name: string;
-  createdAt: any;
+  createdAt: { toDate: () => Date } | Date | undefined;
 }
 
 /**

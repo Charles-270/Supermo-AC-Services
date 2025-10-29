@@ -254,7 +254,7 @@ export function AdminBookingsList() {
               }}
               selectedTechnicianId={selectedTechnicianId}
               serviceArea={selectedBooking?.city || ''}
-              showOnlyAvailable={true}
+              showOnlyAvailable={false}
               showRecommendations={false}
             />
 

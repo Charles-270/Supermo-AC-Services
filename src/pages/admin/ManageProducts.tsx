@@ -3,7 +3,7 @@
  * Create, edit, and delete products with full UI
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -72,11 +72,7 @@ export default function ManageProducts() {
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [currentProductImages, setCurrentProductImages] = useState<string[]>([]);
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       const q = query(collection(db, 'products'), orderBy('name', 'asc'));
@@ -92,7 +88,11 @@ export default function ManageProducts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const showStatus = (type: 'success' | 'error', text: string) => {
     setStatusMessage({ type, text });
@@ -238,6 +238,9 @@ export default function ManageProducts() {
   };
 
   const startEdit = (product: Product) => {
+    // Filter out 'discontinued' status for form editing
+    const formStockStatus = product.stockStatus === 'discontinued' ? 'out-of-stock' : product.stockStatus;
+
     setFormData({
       name: product.name,
       description: product.description || '',
@@ -248,7 +251,7 @@ export default function ManageProducts() {
       capacity: product.specifications?.capacity || '',
       stockQuantity: product.stockQuantity || 0,
       condition: product.condition || 'new',
-      stockStatus: product.stockStatus || 'active',
+      stockStatus: formStockStatus || 'active',
     });
     setCurrentProductImages(product.images || []);
     setEditingId(product.id);
@@ -388,7 +391,7 @@ export default function ManageProducts() {
 
                   {/* Compare At Price */}
                   <div>
-                    <Label htmlFor="compareAtPrice">Original Price (GH₵)</Label>
+                    <Label htmlFor="compareAtPrice">Supplier Base Price (GH₵)</Label>
                     <Input
                       id="compareAtPrice"
                       type="number"
@@ -396,8 +399,11 @@ export default function ManageProducts() {
                       step="0.01"
                       value={formData.compareAtPrice}
                       onChange={(e) => setFormData({ ...formData, compareAtPrice: parseFloat(e.target.value) || 0 })}
-                      placeholder="0.00 (optional)"
+                      placeholder="Net amount before platform fees"
                     />
+                    <p className="text-xs text-neutral-500 mt-1">
+                      This is the supplier cost before the 3% platform fees are added.
+                    </p>
                   </div>
 
                   {/* Capacity */}
@@ -658,9 +664,9 @@ export default function ManageProducts() {
                             {formatCurrency(product.price)}
                           </span>
                           {product.compareAtPrice && (
-                            <span className="ml-2 text-sm text-neutral-500 line-through">
-                              {formatCurrency(product.compareAtPrice)}
-                            </span>
+                            <p className="text-sm text-neutral-500">
+                              Base price: {formatCurrency(product.compareAtPrice)}
+                            </p>
                           )}
                         </div>
                       </div>

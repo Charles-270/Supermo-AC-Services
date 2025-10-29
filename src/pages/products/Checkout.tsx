@@ -22,7 +22,6 @@ import {
   SHIPPING_FEES,
   INSTALLATION_FEES,
   type PaymentMethod,
-  type ShippingAddress,
   type OrderItem,
 } from '@/types/product';
 import {
@@ -30,18 +29,17 @@ import {
   generatePaymentReference,
   convertToPesewas,
   getPaystackChannels,
-  loadPaystackScript,
   verifyPayment,
 } from '@/lib/paystack';
 import { toast } from '@/components/ui/use-toast';
+import { currencyRound, resolveProductPricing } from '@/utils/pricing';
 
 export function Checkout() {
   const navigate = useNavigate();
-  const { cart, getCartTotal, clearCart } = useCart();
+  const { cart, clearCart } = useCart();
   const { user, profile } = useAuth();
 
   const [loading, setLoading] = useState(false);
-  const [paystackLoaded, setPaystackLoaded] = useState(false);
 
   // Form state
   const [fullName, setFullName] = useState(profile?.displayName || '');
@@ -54,20 +52,20 @@ export function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
 
   useEffect(() => {
-    // Load Paystack script
-    loadPaystackScript()
-      .then(() => setPaystackLoaded(true))
-      .catch((error) => console.error('Failed to load Paystack:', error));
-  }, []);
-
-  useEffect(() => {
     // Redirect if cart is empty
     if (cart.length === 0) {
       navigate('/products');
     }
   }, [cart, navigate]);
 
-  const itemsTotal = getCartTotal();
+  const getCartTotal = () => {
+    return cart.reduce((total, item) => {
+      const pricing = resolveProductPricing(item.product);
+      return total + (pricing.totalPrice * item.quantity);
+    }, 0);
+  };
+
+  const itemsTotal = currencyRound(getCartTotal());
 
   const installationFees = cart.reduce((total, item) => {
     if (item.installationRequired) {
@@ -78,7 +76,7 @@ export function Checkout() {
   }, 0);
 
   const shippingFee = SHIPPING_FEES[region] || 50;
-  const grandTotal = itemsTotal + installationFees + shippingFee;
+  const grandTotal = currencyRound(itemsTotal + installationFees + shippingFee);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +105,15 @@ export function Checkout() {
 
     try {
       // Prepare shipping address (exclude undefined fields for Firestore)
-      const shippingAddress: any = {
+      const shippingAddress: {
+        fullName: string;
+        phone: string;
+        address: string;
+        city: string;
+        region: string;
+        landmark?: string;
+        deliveryInstructions?: string;
+      } = {
         fullName,
         phone,
         address,
@@ -125,13 +131,23 @@ export function Checkout() {
 
       // Prepare order items (exclude undefined fields for Firestore)
       const orderItems: OrderItem[] = cart.map((item) => {
-        const orderItem: any = {
+        const pricing = resolveProductPricing(item.product);
+        const orderItem: {
+          productId: string;
+          productName: string;
+          productImage: string;
+          price: number;
+          quantity: number;
+          subtotal: number;
+          installationRequired?: boolean;
+          warranty?: string;
+        } = {
           productId: item.product.id,
           productName: item.product.name,
           productImage: item.product.images?.[0] || '',
-          price: item.product.price,
+          price: pricing.totalPrice,
           quantity: item.quantity,
-          subtotal: item.product.price * item.quantity,
+          subtotal: currencyRound(pricing.totalPrice * item.quantity),
         };
 
         if (item.installationRequired) {
@@ -161,9 +177,8 @@ export function Checkout() {
       // Generate payment reference
       const paymentReference = generatePaymentReference();
 
-      // Initialize Paystack payment
-      if (paystackLoaded) {
-        initializePaystackPayment(
+      // Initialize Paystack payment (loads script on-demand if needed)
+      await initializePaystackPayment(
           {
             email: user.email || '',
             amount: convertToPesewas(grandTotal),
@@ -205,10 +220,6 @@ export function Checkout() {
             setLoading(false);
           }
         );
-      } else {
-        console.error('Paystack not loaded');
-        setLoading(false);
-      }
     } catch (error) {
       console.error('Error creating order:', error);
       toast({
@@ -403,8 +414,10 @@ export function Checkout() {
                 <CardContent className="space-y-4">
                   {/* Order Items */}
                   <div className="space-y-3">
-                    {cart.map((item) => (
-                      <div key={item.product.id} className="flex gap-3 text-sm">
+                    {cart.map((item) => {
+                      const pricing = resolveProductPricing(item.product);
+                      return (
+                        <div key={item.product.id} className="flex gap-3 text-sm">
                         <div className="w-16 h-16 bg-neutral-100 rounded flex-shrink-0">
                           {item.product.images?.[0] && (
                             <img
@@ -418,9 +431,12 @@ export function Checkout() {
                           <p className="font-medium line-clamp-2">{item.product.name}</p>
                           <p className="text-neutral-600">Qty: {item.quantity}</p>
                         </div>
-                        <p className="font-semibold">{formatCurrency(item.product.price * item.quantity)}</p>
-                      </div>
-                    ))}
+                        <p className="font-semibold">
+                          {formatCurrency(pricing.totalPrice * item.quantity)}
+                        </p>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <div className="border-t border-neutral-200 pt-4 space-y-2 text-sm">
@@ -453,7 +469,7 @@ export function Checkout() {
                 </CardContent>
 
                 <div className="p-6 pt-0">
-                  <Button type="submit" size="lg" className="w-full" disabled={loading || !paystackLoaded}>
+                  <Button type="submit" size="lg" className="w-full" disabled={loading}>
                     {loading ? (
                       <>
                         <Loader2 className="h-5 w-5 mr-2 animate-spin" />

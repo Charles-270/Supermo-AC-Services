@@ -1,60 +1,54 @@
 /**
- * Job Detail Page
- * Technicians view full job details and update status
+ * Job Detail Page - Redesigned
+ * Modern job detail view with status management and customer information
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { getBookingById, updateBookingStatus } from '@/services/bookingService';
 import type { Booking, BookingStatus } from '@/types/booking';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { TechnicianLayout } from '@/components/layout/TechnicianLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   MapPin,
   Phone,
   Clock,
-  User,
-  ArrowLeft,
   Navigation,
   CheckCircle2,
   Loader2,
   AlertCircle,
+  PlayCircle,
+  Flag,
+  Wrench,
+  User,
+  Calendar,
+  DollarSign,
 } from 'lucide-react';
 import {
   SERVICE_TYPE_LABELS,
-  BOOKING_STATUS_LABELS,
-  BOOKING_STATUS_VARIANTS,
   TIME_SLOT_LABELS,
+  SERVICE_BASE_PRICING,
+  TECHNICIAN_PAYOUT_RATE,
 } from '@/types/booking';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
 
-// Status workflow for technicians
-const STATUS_WORKFLOW: Record<BookingStatus, BookingStatus | null> = {
-  pending: null, // Can't update pending (admin only)
-  confirmed: 'en_route',
-  en_route: 'arrived',
-  arrived: 'in_progress',
-  in_progress: 'completed', // Opens service report form
-  completed: null,
-  cancelled: null,
-  rescheduled: null,
+// Status workflow mapping
+const NEXT_ACTION: Record<BookingStatus, { action: BookingStatus | null; label: string; icon: any }> = {
+  pending: { action: null, label: '', icon: null },
+  confirmed: { action: 'en_route', label: 'Start Journey', icon: PlayCircle },
+  en_route: { action: 'arrived', label: 'Mark as Arrived', icon: Flag },
+  arrived: { action: 'in_progress', label: 'Start Working', icon: Wrench },
+  in_progress: { action: 'completed', label: 'Complete Job', icon: CheckCircle2 },
+  completed: { action: null, label: '', icon: null },
+  cancelled: { action: null, label: '', icon: null },
+  rescheduled: { action: null, label: '', icon: null },
 };
 
-const STATUS_BUTTON_LABELS: Record<BookingStatus, string> = {
-  pending: '',
-  confirmed: 'Start Journey',
-  en_route: 'Mark as Arrived',
-  arrived: 'Start Work',
-  in_progress: 'Complete Job',
-  completed: '',
-  cancelled: '',
-  rescheduled: '',
-};
-
-export default function JobDetail() {
+export default function JobDetailRedesigned() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -64,60 +58,64 @@ export default function JobDetail() {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadJobDetails();
-  }, [jobId]);
-
-  const loadJobDetails = async () => {
+  const loadJobDetails = useCallback(async () => {
     if (!jobId) return;
 
     try {
       setLoading(true);
-      const data = await getBookingById(jobId);
+      setError(null);
+      const bookingData = await getBookingById(jobId);
 
-      if (!data) {
+      if (!bookingData) {
         setError('Job not found');
         return;
       }
 
-      // Verify technician has access
-      if (data.technicianId !== user?.uid) {
-        setError('You do not have access to this job');
+      // Verify this job belongs to the current technician
+      if (bookingData.technicianId !== user?.uid) {
+        setError('You are not assigned to this job');
         return;
       }
 
-      setBooking(data);
+      setBooking(bookingData);
     } catch (err) {
-      console.error('Error loading job:', err);
+      console.error('Error loading job details:', err);
       setError('Failed to load job details');
     } finally {
       setLoading(false);
     }
-  };
+  }, [jobId, user?.uid]);
+
+  useEffect(() => {
+    void loadJobDetails();
+  }, [loadJobDetails]);
 
   const handleStatusUpdate = async () => {
     if (!booking || !jobId) return;
 
-    const nextStatus = STATUS_WORKFLOW[booking.status];
-    if (!nextStatus) return;
+    const nextAction = NEXT_ACTION[booking.status];
+    if (!nextAction.action) return;
 
-    // If completing job, navigate to service report form
-    if (nextStatus === 'completed') {
+    // Special handling for completion - redirect to completion page
+    if (nextAction.action === 'completed') {
       navigate(`/technician/job/${jobId}/complete`);
       return;
     }
 
     try {
       setUpdating(true);
-      await updateBookingStatus(jobId, nextStatus);
-
-      // Reload job details to get updated status
+      await updateBookingStatus(jobId, nextAction.action);
       await loadJobDetails();
+
+      toast({
+        title: 'Status updated',
+        description: nextAction.label,
+      });
     } catch (err) {
       console.error('Error updating status:', err);
       toast({
         title: 'Update failed',
-        description: 'Failed to update job status. Please try again.',
+        description: 'Please try again',
         variant: 'destructive',
       });
     } finally {
@@ -137,186 +135,312 @@ export default function JobDetail() {
     window.location.href = `tel:${booking.customerPhone}`;
   };
 
+  const getStatusBadge = (status: string) => {
+    const statusConfig: Record<string, { label: string; variant: 'secondary' | 'default' | 'destructive' }> = {
+      'pending': { label: 'Pending', variant: 'secondary' },
+      'confirmed': { label: 'New Job', variant: 'default' },
+      'en_route': { label: 'En Route', variant: 'default' },
+      'arrived': { label: 'Arrived', variant: 'default' },
+      'in_progress': { label: 'In Progress', variant: 'default' },
+      'completed': { label: 'Completed', variant: 'default' },
+      'cancelled': { label: 'Cancelled', variant: 'destructive' },
+    };
+
+    const config = statusConfig[status] || { label: status, variant: 'secondary' as const };
+
+    return (
+      <Badge variant={config.variant} className="capitalize">
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const formatTimeSlot = (timeSlot: string) => {
+    return TIME_SLOT_LABELS[timeSlot as keyof typeof TIME_SLOT_LABELS] || timeSlot;
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-cool flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary-500 mx-auto mb-4" />
-          <p className="text-neutral-600">Loading job details...</p>
+      <TechnicianLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
-      </div>
+      </TechnicianLayout>
     );
   }
 
   if (error || !booking) {
     return (
-      <div className="min-h-screen bg-gradient-cool flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6 text-center">
-            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Error</h2>
-            <p className="text-neutral-600 mb-4">{error || 'Job not found'}</p>
-            <Button onClick={() => navigate('/dashboard/technician')}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <TechnicianLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6 text-center">
+              <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Error</h2>
+              <p className="text-gray-600 mb-4">{error || 'Job not found'}</p>
+              <Button onClick={() => navigate('/technician/jobs')}>
+                Back to Jobs
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </TechnicianLayout>
     );
   }
 
-  const nextStatus = STATUS_WORKFLOW[booking.status];
-  const canUpdateStatus = nextStatus !== null;
+  const nextAction = NEXT_ACTION[booking.status];
+  const canUpdate = nextAction.action !== null;
+  const finalCost = SERVICE_BASE_PRICING[booking.serviceType] || booking.agreedPrice || 0;
+  const earnings = finalCost * TECHNICIAN_PAYOUT_RATE;
+
+  const serviceDetails =
+    booking.serviceDetails && typeof booking.serviceDetails === 'object'
+      ? (booking.serviceDetails as Record<string, unknown>)
+      : null;
+  const serviceDescription =
+    serviceDetails && typeof serviceDetails.description === 'string'
+      ? serviceDetails.description
+      : undefined;
+  const urgencyLevel =
+    serviceDetails && typeof serviceDetails.urgencyLevel === 'string'
+      ? serviceDetails.urgencyLevel
+      : undefined;
+  const additionalServiceDetails =
+    serviceDetails
+      ? Object.entries(serviceDetails).filter(
+        ([key]) => key !== 'description' && key !== 'urgencyLevel'
+      )
+      : [];
 
   return (
-    <div className="min-h-screen bg-gradient-cool">
-      {/* Header */}
-      <header className="bg-white border-b border-neutral-200 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/dashboard/technician')}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div>
-                <h1 className="text-xl font-bold text-neutral-900">Job Details</h1>
-                <p className="text-sm text-neutral-600">#{jobId?.slice(0, 8)}</p>
-              </div>
-            </div>
-            <Badge variant={BOOKING_STATUS_VARIANTS[booking.status]}>
-              {BOOKING_STATUS_LABELS[booking.status]}
-            </Badge>
+    <TechnicianLayout>
+      <div className="p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Job Details</h1>
+            <p className="text-gray-600 mt-1">
+              {SERVICE_TYPE_LABELS[booking.serviceType as keyof typeof SERVICE_TYPE_LABELS] || booking.serviceType}
+            </p>
           </div>
+          {getStatusBadge(booking.status)}
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Service Info */}
-        <Card>
+        {/* Earnings Card */}
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
           <CardHeader>
-            <CardTitle>Service Information</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Your Earnings
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-neutral-500">Service Type</p>
-              <p className="text-lg font-semibold">{SERVICE_TYPE_LABELS[booking.serviceType]}</p>
+          <CardContent>
+            <div className="text-center space-y-2">
+              <div className="text-3xl font-bold text-green-600">
+                {formatCurrency(earnings)}
+              </div>
+              <div className="text-sm space-y-1">
+                <p className="text-green-700">
+                  Customer pays {formatCurrency(finalCost)}
+                </p>
+                <p className="text-xs text-green-600">
+                  {booking.status === 'completed' 
+                    ? '✓ Final amount paid' 
+                    : '📌 Agreed price at booking'}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-neutral-500">Scheduled Date & Time</p>
-              <div className="flex items-center gap-2 mt-1">
-                <Clock className="h-4 w-4 text-neutral-400" />
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Customer Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <User className="h-5 w-5 text-blue-600" />
+                Customer Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-500">Name</p>
+                <p className="font-medium text-lg">{booking.customerName}</p>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Phone</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{booking.customerPhone}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={callCustomer}
+                    className="gap-2"
+                  >
+                    <Phone className="h-4 w-4" />
+                    Call
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Email</p>
+                <p className="font-medium">{booking.customerEmail}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Job Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-purple-600" />
+                Job Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-500">Service Type</p>
                 <p className="font-medium">
-                  {booking.preferredDate?.toDate?.()?.toLocaleDateString()} -{' '}
-                  {TIME_SLOT_LABELS[booking.preferredTimeSlot]}
+                  {SERVICE_TYPE_LABELS[booking.serviceType as keyof typeof SERVICE_TYPE_LABELS] || booking.serviceType}
                 </p>
               </div>
-            </div>
-            {booking.serviceDetails.issueDescription && (
-              <div>
-                <p className="text-sm text-neutral-500">Issue Description</p>
-                <p className="mt-1">{booking.serviceDetails.issueDescription}</p>
-              </div>
-            )}
-            {booking.estimatedCost && (
-              <div>
-                <p className="text-sm text-neutral-500">Estimated Cost</p>
-                <p className="text-2xl font-bold text-primary-600">
-                  {formatCurrency(booking.estimatedCost)}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
-        {/* Customer Info */}
+              <div>
+                <p className="text-sm text-gray-500">Date & Time</p>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <p className="font-medium">{formatDate(booking.preferredDate)}</p>
+                    <p className="text-sm text-gray-600">{formatTimeSlot(booking.preferredTimeSlot)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Service Package</p>
+                <p className="font-medium">
+                  {SERVICE_TYPE_LABELS[booking.serviceType] || booking.serviceType}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Location Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Customer Information</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-red-600" />
+              Location
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-neutral-400" />
-              <p className="font-medium">{booking.customerName}</p>
-            </div>
             <div>
-              <p className="text-sm text-neutral-500">Phone Number</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-1"
-                onClick={callCustomer}
-              >
-                <Phone className="mr-2 h-4 w-4" />
-                {booking.customerPhone}
-              </Button>
+              <p className="text-sm text-gray-500">Address</p>
+              <p className="font-medium text-lg">{booking.address}</p>
+              <p className="text-gray-600">{booking.city}</p>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Location */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Location</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-2">
-              <MapPin className="h-5 w-5 text-neutral-400 mt-0.5" />
+            {booking.locationNotes && (
               <div>
-                <p className="font-medium">{booking.address}</p>
-                <p className="text-neutral-600">{booking.city}</p>
-                {booking.locationNotes && (
-                  <p className="text-sm text-neutral-500 mt-1">Note: {booking.locationNotes}</p>
-                )}
+                <p className="text-sm text-gray-500">Location Notes</p>
+                <p className="font-medium">{booking.locationNotes}</p>
               </div>
-            </div>
-            <Button onClick={openGoogleMaps} className="w-full">
-              <Navigation className="mr-2 h-4 w-4" />
+            )}
+
+            <Button
+              onClick={openGoogleMaps}
+              className="gap-2 w-full sm:w-auto"
+            >
+              <Navigation className="h-4 w-4" />
               Open in Google Maps
             </Button>
           </CardContent>
         </Card>
 
-        {/* Status Update Button */}
-        {canUpdateStatus && (
-          <Card className="border-primary-500">
-            <CardContent className="pt-6">
-              <Button
-                onClick={handleStatusUpdate}
-                disabled={updating}
-                size="lg"
-                className="w-full"
-              >
-                {updating ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="mr-2 h-5 w-5" />
-                    {STATUS_BUTTON_LABELS[booking.status]}
-                  </>
+        {/* Service Details */}
+        {serviceDetails && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Service Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {serviceDescription && (
+                  <div>
+                    <p className="text-sm text-gray-500">Description</p>
+                    <p className="font-medium">{serviceDescription}</p>
+                  </div>
                 )}
-              </Button>
+
+                {urgencyLevel && (
+                  <div>
+                    <p className="text-sm text-gray-500">Urgency</p>
+                    <Badge variant={urgencyLevel === 'urgent' ? 'destructive' : 'secondary'}>
+                      {urgencyLevel}
+                    </Badge>
+                  </div>
+                )}
+
+                {additionalServiceDetails.length > 0 && (
+                  <div className="space-y-1 pt-2">
+                    <p className="text-sm text-gray-500">Additional Details</p>
+                    <div className="space-y-1 text-sm text-gray-700">
+                      {additionalServiceDetails.map(([key, value]) => (
+                        <p key={key}>
+                          <span className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1')}:</span>{' '}
+                          {typeof value === 'string' || typeof value === 'number'
+                            ? String(value)
+                            : JSON.stringify(value)}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
 
-        {booking.status === 'completed' && (
-          <Card className="bg-success/10 border-success">
-            <CardContent className="pt-6 text-center">
-              <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-2" />
-              <p className="font-semibold text-success">Job Completed!</p>
+        {/* Action Button */}
+        {canUpdate && (
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="pt-6">
+              <div className="text-center space-y-4">
+                <p className="text-lg font-semibold text-blue-900">
+                  Ready for the next step?
+                </p>
+                <Button
+                  onClick={handleStatusUpdate}
+                  disabled={updating}
+                  size="lg"
+                  className="gap-2"
+                >
+                  {updating ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <nextAction.icon className="h-5 w-5" />
+                  )}
+                  {updating ? 'Updating...' : nextAction.label}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
-      </main>
-    </div>
+      </div>
+    </TechnicianLayout>
   );
 }
