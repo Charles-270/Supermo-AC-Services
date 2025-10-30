@@ -1,13 +1,14 @@
 /**
  * Payment Method Selector Component
  * Payment method selection with card-style radio tiles
+ *
+ * Updated October 2025:
+ * - Align payment options with supported Paystack channels
+ * - Removed manual card/mobile money inputs (handled securely by Paystack widget)
  */
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { CreditCard, Smartphone, Wallet, Check } from 'lucide-react';
+import { CreditCard, Smartphone, Building2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PaymentMethodSelectorProps {
@@ -21,23 +22,20 @@ const PAYMENT_METHODS = [
   {
     id: 'card',
     name: 'Credit/Debit Card',
-    description: 'Pay securely with your card',
+    description: 'Pay securely with your Visa or Mastercard',
     icon: CreditCard,
-    hasAdditionalFields: true,
   },
   {
     id: 'mobile-money',
     name: 'Mobile Money',
-    description: 'MTN, Vodafone, AirtelTigo',
+    description: 'MTN, Vodafone, AirtelTigo via Paystack',
     icon: Smartphone,
-    hasAdditionalFields: true,
   },
   {
-    id: 'cash-on-delivery',
-    name: 'Cash on Delivery',
-    description: 'Pay when you receive your order',
-    icon: Wallet,
-    hasAdditionalFields: false,
+    id: 'bank-transfer',
+    name: 'Bank Transfer',
+    description: 'Pay via bank transfer with instant verification',
+    icon: Building2,
   },
 ];
 
@@ -47,29 +45,12 @@ export function PaymentMethodSelector({
   onBack,
   onNext,
 }: PaymentMethodSelectorProps) {
-  const [mobileMoneyNumber, setMobileMoneyNumber] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-
   const handleNext = () => {
     if (!selectedMethod) return;
-
-    // Validate additional fields if needed
-    if (selectedMethod === 'mobile-money' && !mobileMoneyNumber) {
-      return;
-    }
-    if (selectedMethod === 'card' && !cardNumber) {
-      return;
-    }
-
     onNext();
   };
 
-  const isFormValid = () => {
-    if (!selectedMethod) return false;
-    if (selectedMethod === 'mobile-money' && !mobileMoneyNumber) return false;
-    if (selectedMethod === 'card' && !cardNumber) return false;
-    return true;
-  };
+  const isFormValid = () => Boolean(selectedMethod);
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-8">
@@ -79,7 +60,7 @@ export function PaymentMethodSelector({
           Payment Method
         </h2>
         <p className="mt-2 text-sm text-neutral-600">
-          Choose how you'd like to pay
+          Choose how you’d like to complete your payment
         </p>
       </div>
 
@@ -127,97 +108,23 @@ export function PaymentMethodSelector({
 
                   {/* Method Info */}
                   <div className="flex-1">
-                    <p className="font-semibold text-neutral-900">{method.name}</p>
-                    <p className="text-sm text-neutral-600">{method.description}</p>
+                    <p className="text-base font-semibold text-neutral-900">
+                      {method.name}
+                    </p>
+                    <p className="text-sm text-neutral-600">
+                      {method.description}
+                    </p>
                   </div>
                 </div>
               </button>
 
-              {/* Additional Fields (Accordion) */}
-              {isSelected && method.hasAdditionalFields && (
-                <div className="mt-3 rounded-lg border border-neutral-200 bg-white p-4 space-y-4">
-                  {method.id === 'mobile-money' && (
-                    <div className="space-y-2">
-                      <Label htmlFor="mobileMoneyNumber" className="text-sm font-medium">
-                        Mobile Money Number <span className="text-red-500">*</span>
-                      </Label>
-                      <div className="flex gap-2">
-                        <select
-                          className="h-12 w-24 rounded-xl border border-neutral-300 bg-white px-3 text-sm"
-                          defaultValue="+233"
-                        >
-                          <option value="+233">+233</option>
-                        </select>
-                        <Input
-                          id="mobileMoneyNumber"
-                          type="tel"
-                          inputMode="tel"
-                          placeholder="Enter mobile money number"
-                          value={mobileMoneyNumber}
-                          onChange={(e) => setMobileMoneyNumber(e.target.value)}
-                          className="h-12 flex-1 rounded-xl"
-                          required
-                        />
-                      </div>
-                      <p className="text-xs text-neutral-500">
-                        You'll receive a prompt to authorize payment
-                      </p>
-                    </div>
-                  )}
-
-                  {method.id === 'card' && (
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="cardNumber" className="text-sm font-medium">
-                          Card Number <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id="cardNumber"
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="1234 5678 9012 3456"
-                          value={cardNumber}
-                          onChange={(e) => setCardNumber(e.target.value)}
-                          className="h-12 rounded-xl"
-                          maxLength={19}
-                          required
-                        />
-                      </div>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="expiryDate" className="text-sm font-medium">
-                            Expiry Date <span className="text-red-500">*</span>
-                          </Label>
-                          <Input
-                            id="expiryDate"
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="MM/YY"
-                            className="h-12 rounded-xl"
-                            maxLength={5}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="cvv" className="text-sm font-medium">
-                            CVV <span className="text-red-500">*</span>
-                          </Label>
-                          <Input
-                            id="cvv"
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="123"
-                            className="h-12 rounded-xl"
-                            maxLength={4}
-                            required
-                          />
-                        </div>
-                      </div>
-                      <p className="text-xs text-neutral-500">
-                        Your payment information is encrypted and secure
-                      </p>
-                    </div>
-                  )}
+              {method.id === 'bank-transfer' && isSelected && (
+                <div className="mt-4 space-y-2 rounded-xl border border-teal-100 bg-teal-50/70 p-4 text-sm text-neutral-600">
+                  <p className="font-medium text-neutral-900">How bank transfer works</p>
+                  <p>
+                    We’ll display Paystack bank transfer instructions during checkout so you can
+                    complete payment securely from your banking app.
+                  </p>
                 </div>
               )}
             </div>

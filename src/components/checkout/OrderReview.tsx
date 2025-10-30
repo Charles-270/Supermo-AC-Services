@@ -1,6 +1,10 @@
 /**
  * Order Review Component
  * Final review before placing order
+ *
+ * Updated October 2025:
+ * - Reflect true pricing model (items, installation, shipping)
+ * - Support async order submission
  */
 
 import { useState } from 'react';
@@ -24,27 +28,27 @@ interface OrderReviewProps {
   cart: CartItem[];
   addressData: AddressData;
   paymentMethod: string;
-  subtotal: number;
-  tax: number;
-  delivery: number;
+  itemsTotal: number;
+  installationFee: number;
+  shippingFee: number;
   total: number;
   onBack: () => void;
-  onPlaceOrder: () => void;
+  onPlaceOrder: () => Promise<void>;
 }
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   'card': 'Credit/Debit Card',
   'mobile-money': 'Mobile Money',
-  'cash-on-delivery': 'Cash on Delivery',
+  'bank-transfer': 'Bank Transfer',
 };
 
 export function OrderReview({
   cart,
   addressData,
   paymentMethod,
-  subtotal,
-  tax,
-  delivery,
+  itemsTotal,
+  installationFee,
+  shippingFee,
   total,
   onBack,
   onPlaceOrder,
@@ -140,7 +144,7 @@ export function OrderReview({
                     <div className="flex-1">
                       <p className="font-medium text-sm">{item.product.name}</p>
                       <p className="text-xs text-neutral-600">
-                        Qty: {item.quantity} × {formatCurrency(pricing.totalPrice)}
+                        Qty: {item.quantity} • {formatCurrency(pricing.totalPrice)}
                       </p>
                     </div>
                     <p className="font-semibold">{formatCurrency(lineTotal)}</p>
@@ -153,16 +157,18 @@ export function OrderReview({
           {/* Totals */}
           <div className="space-y-3 border-t pt-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-neutral-600">Subtotal</span>
-              <span className="font-medium">{formatCurrency(subtotal)}</span>
+              <span className="text-neutral-600">Items Total</span>
+              <span className="font-medium">{formatCurrency(itemsTotal)}</span>
             </div>
+            {installationFee > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-neutral-600">Installation</span>
+                <span className="font-medium">{formatCurrency(installationFee)}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between text-sm">
-              <span className="text-neutral-600">Tax (12.5%)</span>
-              <span className="font-medium">{formatCurrency(tax)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-neutral-600">Delivery</span>
-              <span className="font-medium">{formatCurrency(delivery)}</span>
+              <span className="text-neutral-600">Shipping ({addressData.region})</span>
+              <span className="font-medium">{formatCurrency(shippingFee)}</span>
             </div>
             <div className="flex items-center justify-between border-t pt-3">
               <span className="text-lg font-semibold">Total</span>

@@ -8,9 +8,20 @@ import {
   getDocs,
   query,
   where,
+  orderBy,
   Timestamp,
+  getDoc,
+  doc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import {
+  aggregateDailyOrders,
+  finalizeDailyAggregates,
+  computeTopProductsAllTime,
+  isPaidStatus,
+  toDateKey,
+  type DailyProductAggregate,
+} from '@/utils/analyticsRollup';
 
 /**
  * Revenue data point for charts
@@ -19,7 +30,7 @@ export interface RevenueDataPoint {
   date: string;
   revenue: number;
   orders: number;
-  [key: string]: string | number; // Index signature for generic functions
+  [key: string]: string | number;
 }
 
 /**
@@ -29,7 +40,7 @@ export interface UserGrowthDataPoint {
   date: string;
   totalUsers: number;
   newUsers: number;
-  [key: string]: string | number; // Index signature for generic functions
+  [key: string]: string | number;
 }
 
 /**
@@ -40,7 +51,7 @@ export interface BookingTrendDataPoint {
   bookings: number;
   completed: number;
   pending: number;
-  [key: string]: string | number; // Index signature for generic functions
+  [key: string]: string | number;
 }
 
 /**
@@ -53,6 +64,11 @@ export interface TopProduct {
   revenue: number;
 }
 
+export interface TopProductTrendPoint {
+  date: string;
+  products: DailyProductAggregate[];
+}
+
 /**
  * Service type analytics
  */
@@ -62,63 +78,109 @@ export interface ServiceTypeAnalytics {
   revenue: number;
 }
 
+const ANALYTICS_DAILY_COLLECTION = 'analytics_daily';
+const ANALYTICS_TOP_PRODUCTS_COLLECTION = 'analytics_top_products';
+const ANALYTICS_TOP_PRODUCTS_DOC_ID = 'all-time';
+
+type DailyAnalyticsMap = Map<
+  string,
+  {
+    revenue: number;
+    orders: number;
+    topProducts: DailyProductAggregate[];
+  }
+>;
+
+const getStartOfDayUtc = (date: Date): Date => {
+  const copy = new Date(date);
+  copy.setUTCHours(0, 0, 0, 0);
+  return copy;
+};
+
+const loadDailyAnalytics = async (startTimestamp: Timestamp): Promise<DailyAnalyticsMap> => {
+  const analyticsRef = collection(db, ANALYTICS_DAILY_COLLECTION);
+  const analyticsQuery = query(
+    analyticsRef,
+    where('date', '>=', startTimestamp),
+    orderBy('date', 'asc')
+  );
+
+  const analyticsSnapshot = await getDocs(analyticsQuery);
+  if (!analyticsSnapshot.empty) {
+    const aggregated: DailyAnalyticsMap = new Map();
+    analyticsSnapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+
+      let dateValue: Date;
+      if (data.date instanceof Timestamp) {
+        dateValue = data.date.toDate();
+      } else {
+        dateValue = new Date(`${docSnap.id}T00:00:00Z`);
+      }
+
+      const dateKey = typeof data.dateKey === 'string' ? data.dateKey : toDateKey(dateValue);
+
+      aggregated.set(dateKey, {
+        revenue: Number(data.revenue ?? 0),
+        orders: Number(data.orders ?? 0),
+        topProducts: Array.isArray(data.topProducts)
+          ? (data.topProducts as DailyProductAggregate[])
+          : [],
+      });
+    });
+
+    return aggregated;
+  }
+
+  // Fallback: compute on the fly from orders
+  const ordersRef = collection(db, 'orders');
+  const ordersQuery = query(ordersRef, where('createdAt', '>=', startTimestamp));
+  const ordersSnapshot = await getDocs(ordersQuery);
+  const orders = ordersSnapshot.docs.map((docSnap) => docSnap.data());
+
+  const aggregated = finalizeDailyAggregates(aggregateDailyOrders(orders), 10);
+  const fallbackMap: DailyAnalyticsMap = new Map();
+
+  aggregated.forEach((entry) => {
+    fallbackMap.set(entry.dateKey, {
+      revenue: entry.revenue,
+      orders: entry.orders,
+      topProducts: entry.topProducts,
+    });
+  });
+
+  return fallbackMap;
+};
+
 /**
  * Get revenue analytics for the last N days
- * Uses client-side filtering to avoid compound index requirement
  */
 export async function getRevenueAnalytics(days: number = 30): Promise<RevenueDataPoint[]> {
   try {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const today = getStartOfDayUtc(new Date());
+    const startDate = new Date(today);
+    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
     const startTimestamp = Timestamp.fromDate(startDate);
 
-    // Simple query with single where clause - no compound index needed
-    const ordersRef = collection(db, 'orders');
-    const q = query(
-      ordersRef,
-      where('createdAt', '>=', startTimestamp)
-    );
-
-    const querySnapshot = await getDocs(q);
-
-    // Group by date with client-side filtering for paymentStatus
-    const revenueByDate: Map<string, { revenue: number; count: number }> = new Map();
-
-    querySnapshot.forEach((doc) => {
-      const order = doc.data();
-
-      // Client-side filter: only include paid orders
-      if (order.paymentStatus !== 'paid') return;
-
-      const date = order.createdAt?.toDate?.();
-      if (date) {
-        const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
-        const current = revenueByDate.get(dateKey) || { revenue: 0, count: 0 };
-        revenueByDate.set(dateKey, {
-          revenue: current.revenue + (order.totalAmount || 0),
-          count: current.count + 1,
-        });
-      }
-    });
-
-    // Convert to array and sort by date
+    const analyticsMap = await loadDailyAnalytics(startTimestamp);
     const dataPoints: RevenueDataPoint[] = [];
+
     for (let i = 0; i < days; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - (days - i - 1));
+      const date = new Date(startDate);
+      date.setUTCDate(startDate.getUTCDate() + i);
       const dateKey = date.toISOString().split('T')[0];
-      const data = revenueByDate.get(dateKey) || { revenue: 0, count: 0 };
+      const entry = analyticsMap.get(dateKey);
+
       dataPoints.push({
         date: dateKey,
-        revenue: data.revenue,
-        orders: data.count,
+        revenue: entry?.revenue ?? 0,
+        orders: entry?.orders ?? 0,
       });
     }
 
     return dataPoints;
   } catch (error) {
     console.error('Error fetching revenue analytics:', error);
-    // Return empty data instead of throwing - more graceful degradation
     return [];
   }
 }
@@ -129,76 +191,86 @@ export async function getRevenueAnalytics(days: number = 30): Promise<RevenueDat
  */
 export async function getUserGrowthAnalytics(days: number = 30): Promise<UserGrowthDataPoint[]> {
   try {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    const startTimestamp = Timestamp.fromDate(startDate);
+
     const usersRef = collection(db, 'users');
-    const querySnapshot = await getDocs(usersRef);
+    const q = query(usersRef, where('createdAt', '>=', startTimestamp));
+    const usersSnapshot = await getDocs(q);
 
-    const usersByDate: Map<string, number> = new Map();
+    const growthByDate: Map<string, { total: number; newUsers: number }> = new Map();
 
-    querySnapshot.forEach((doc) => {
-      const user = doc.data();
+    usersSnapshot.forEach((docSnap) => {
+      const user = docSnap.data();
       const date = user.createdAt?.toDate?.();
-      if (date) {
-        const dateKey = date.toISOString().split('T')[0];
-        usersByDate.set(dateKey, (usersByDate.get(dateKey) || 0) + 1);
-      }
+      if (!date) return;
+
+      const dateKey = date.toISOString().split('T')[0];
+      const current = growthByDate.get(dateKey) || { total: 0, newUsers: 0 };
+      growthByDate.set(dateKey, {
+        total: current.total + 1,
+        newUsers: current.newUsers + 1,
+      });
     });
 
-    // Calculate cumulative and new users per day
     const dataPoints: UserGrowthDataPoint[] = [];
-    let cumulativeUsers = 0;
+    let runningTotal = 0;
 
     for (let i = 0; i < days; i++) {
       const date = new Date();
       date.setDate(date.getDate() - (days - i - 1));
       const dateKey = date.toISOString().split('T')[0];
-      const newUsers = usersByDate.get(dateKey) || 0;
-      cumulativeUsers += newUsers;
+      const data = growthByDate.get(dateKey) || { total: 0, newUsers: 0 };
+      runningTotal += data.newUsers;
 
       dataPoints.push({
         date: dateKey,
-        totalUsers: cumulativeUsers,
-        newUsers,
+        totalUsers: runningTotal,
+        newUsers: data.newUsers,
       });
     }
 
     return dataPoints;
   } catch (error) {
     console.error('Error fetching user growth analytics:', error);
-    // Return empty data instead of throwing
     return [];
   }
 }
 
 /**
  * Get booking trends
- * Simple query with date filter, no compound index needed
+ * Aggregates bookings by day and status
  */
 export async function getBookingTrends(days: number = 30): Promise<BookingTrendDataPoint[]> {
   try {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
+    const startTimestamp = Timestamp.fromDate(startDate);
 
     const bookingsRef = collection(db, 'bookings');
-    const q = query(
-      bookingsRef,
-      where('createdAt', '>=', Timestamp.fromDate(startDate))
-    );
+    const q = query(bookingsRef, where('createdAt', '>=', startTimestamp));
+    const bookingsSnapshot = await getDocs(q);
 
-    const querySnapshot = await getDocs(q);
+    const bookingsByDate: Map<
+      string,
+      { total: number; completed: number; pending: number }
+    > = new Map();
 
-    const bookingsByDate: Map<string, { total: number; completed: number; pending: number }> = new Map();
-
-    querySnapshot.forEach((doc) => {
-      const booking = doc.data();
+    bookingsSnapshot.forEach((docSnap) => {
+      const booking = docSnap.data();
       const date = booking.createdAt?.toDate?.();
-      if (date) {
-        const dateKey = date.toISOString().split('T')[0];
-        const current = bookingsByDate.get(dateKey) || { total: 0, completed: 0, pending: 0 };
-        current.total += 1;
-        if (booking.status === 'completed') current.completed += 1;
-        else if (booking.status === 'pending' || booking.status === 'confirmed') current.pending += 1;
-        bookingsByDate.set(dateKey, current);
-      }
+      if (!date) return;
+
+      const dateKey = date.toISOString().split('T')[0];
+      const current =
+        bookingsByDate.get(dateKey) || { total: 0, completed: 0, pending: 0 };
+
+      bookingsByDate.set(dateKey, {
+        total: current.total + 1,
+        completed: current.completed + (booking.status === 'completed' ? 1 : 0),
+        pending: current.pending + (booking.status === 'pending' ? 1 : 0),
+      });
     });
 
     const dataPoints: BookingTrendDataPoint[] = [];
@@ -207,6 +279,7 @@ export async function getBookingTrends(days: number = 30): Promise<BookingTrendD
       date.setDate(date.getDate() - (days - i - 1));
       const dateKey = date.toISOString().split('T')[0];
       const data = bookingsByDate.get(dateKey) || { total: 0, completed: 0, pending: 0 };
+
       dataPoints.push({
         date: dateKey,
         bookings: data.total,
@@ -218,59 +291,87 @@ export async function getBookingTrends(days: number = 30): Promise<BookingTrendD
     return dataPoints;
   } catch (error) {
     console.error('Error fetching booking trends:', error);
-    // Return empty data instead of throwing
     return [];
   }
 }
 
 /**
- * Get top selling products
- * Fetches all orders and filters for paid ones client-side
+ * Get top selling products (all-time)
  */
 export async function getTopProducts(limit: number = 10): Promise<TopProduct[]> {
   try {
-    const ordersRef = collection(db, 'orders');
-    const querySnapshot = await getDocs(ordersRef);
+    const aggregatedDocRef = doc(
+      db,
+      ANALYTICS_TOP_PRODUCTS_COLLECTION,
+      ANALYTICS_TOP_PRODUCTS_DOC_ID
+    );
+    const aggregatedSnapshot = await getDoc(aggregatedDocRef);
 
-    const productSales: Map<string, { name: string; quantity: number; revenue: number }> = new Map();
+    if (aggregatedSnapshot.exists()) {
+      const data = aggregatedSnapshot.data() as { products?: DailyProductAggregate[] };
+      const aggregatedProducts = Array.isArray(data.products) ? data.products : [];
+      const ranked = aggregatedProducts
+        .slice(0, limit)
+        .map((product) => ({
+          productId: product.productId,
+          productName: product.productName,
+          totalSold: product.units,
+          revenue: product.revenue,
+        }))
+        .filter((item) => item.totalSold > 0);
 
-    querySnapshot.forEach((doc) => {
-      const order = doc.data();
-
-      // Client-side filter: only include paid orders
-      if (order.paymentStatus !== 'paid') return;
-
-      if (order.items && Array.isArray(order.items)) {
-        order.items.forEach((item: { productId: string; productName?: string; quantity?: number; subtotal?: number }) => {
-          const current = productSales.get(item.productId) || {
-            name: item.productName || 'Unknown Product',
-            quantity: 0,
-            revenue: 0,
-          };
-          productSales.set(item.productId, {
-            name: item.productName || current.name,
-            quantity: current.quantity + (item.quantity || 0),
-            revenue: current.revenue + (item.subtotal || 0),
-          });
-        });
+      if (ranked.length > 0) {
+        return ranked;
       }
-    });
+    }
 
-    // Convert to array and sort by quantity
-    const topProducts: TopProduct[] = Array.from(productSales.entries())
-      .map(([productId, data]) => ({
-        productId,
-        productName: data.name,
-        totalSold: data.quantity,
-        revenue: data.revenue,
-      }))
-      .sort((a, b) => b.totalSold - a.totalSold)
-      .slice(0, limit);
+    const ordersSnapshot = await getDocs(collection(db, 'orders'));
+    const orders = ordersSnapshot.docs.map((docSnap) => docSnap.data());
+    const computed = computeTopProductsAllTime(orders, limit);
 
-    return topProducts;
+    return computed.map((product) => ({
+      productId: product.productId,
+      productName: product.productName,
+      totalSold: product.units,
+      revenue: product.revenue,
+    }));
   } catch (error) {
     console.error('Error fetching top products:', error);
-    // Return empty data instead of throwing
+    return [];
+  }
+}
+
+/**
+ * Get top product trends across the selected window
+ */
+export async function getTopProductsTrend(
+  days: number = 30,
+  limit: number = 5
+): Promise<TopProductTrendPoint[]> {
+  try {
+    const today = getStartOfDayUtc(new Date());
+    const startDate = new Date(today);
+    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+    const startTimestamp = Timestamp.fromDate(startDate);
+
+    const analyticsMap = await loadDailyAnalytics(startTimestamp);
+    const trend: TopProductTrendPoint[] = [];
+
+    for (let i = 0; i < days; i++) {
+      const date = new Date(startDate);
+      date.setUTCDate(startDate.getUTCDate() + i);
+      const dateKey = date.toISOString().split('T')[0];
+      const entry = analyticsMap.get(dateKey);
+
+      trend.push({
+        date: dateKey,
+        products: entry ? entry.topProducts.slice(0, limit) : [],
+      });
+    }
+
+    return trend;
+  } catch (error) {
+    console.error('Error fetching top product trend analytics:', error);
     return [];
   }
 }
@@ -286,8 +387,8 @@ export async function getServiceTypeAnalytics(): Promise<ServiceTypeAnalytics[]>
 
     const serviceStats: Map<string, { count: number; revenue: number }> = new Map();
 
-    querySnapshot.forEach((doc) => {
-      const booking = doc.data();
+    querySnapshot.forEach((docSnap) => {
+      const booking = docSnap.data();
       const serviceType = booking.serviceType || 'Other';
       const current = serviceStats.get(serviceType) || { count: 0, revenue: 0 };
       serviceStats.set(serviceType, {
@@ -307,7 +408,6 @@ export async function getServiceTypeAnalytics(): Promise<ServiceTypeAnalytics[]>
     return analytics;
   } catch (error) {
     console.error('Error fetching service type analytics:', error);
-    // Return empty data instead of throwing
     return [];
   }
 }
@@ -326,50 +426,40 @@ export interface PlatformStats {
 
 export async function getPlatformStats(): Promise<PlatformStats> {
   try {
-    // Get all collections in parallel
     const [ordersSnapshot, bookingsSnapshot, usersSnapshot] = await Promise.all([
       getDocs(collection(db, 'orders')),
       getDocs(collection(db, 'bookings')),
       getDocs(collection(db, 'users')),
     ]);
 
-    // Calculate E-Commerce Revenue (from orders)
     let ecommerceRevenue = 0;
     let paidOrders = 0;
 
-    ordersSnapshot.forEach((doc) => {
-      const order = doc.data();
-      if (order.paymentStatus === 'paid') {
+    ordersSnapshot.forEach((docSnap) => {
+      const order = docSnap.data();
+      if (isPaidStatus(order.paymentStatus)) {
         ecommerceRevenue += order.totalAmount || 0;
         paidOrders += 1;
       }
     });
 
-    // Calculate Booking Revenue (from completed technician services)
     let bookingRevenue = 0;
     let completedBookings = 0;
 
-    bookingsSnapshot.forEach((doc) => {
-      const booking = doc.data();
+    bookingsSnapshot.forEach((docSnap) => {
+      const booking = docSnap.data();
       if (booking.status === 'completed') {
-        // Use finalCost if available, otherwise use agreedPrice or estimatedCost
         const revenue = booking.finalCost || booking.agreedPrice || booking.estimatedCost || 0;
         bookingRevenue += revenue;
         completedBookings += 1;
       }
     });
 
-    // Combine both revenue sources
     const totalRevenue = ecommerceRevenue + bookingRevenue;
-
     const totalOrders = ordersSnapshot.size;
     const totalBookings = bookingsSnapshot.size;
     const totalUsers = usersSnapshot.size;
-    
-    // Average order value based on paid orders only
     const averageOrderValue = paidOrders > 0 ? ecommerceRevenue / paidOrders : 0;
-    
-    // Conversion rate based on total transactions (orders + bookings) vs users
     const totalTransactions = paidOrders + completedBookings;
     const conversionRate = totalUsers > 0 ? (totalTransactions / totalUsers) * 100 : 0;
 
@@ -383,7 +473,6 @@ export async function getPlatformStats(): Promise<PlatformStats> {
     };
   } catch (error) {
     console.error('Error fetching platform stats:', error);
-    // Return zero stats instead of throwing
     return {
       totalRevenue: 0,
       totalOrders: 0,

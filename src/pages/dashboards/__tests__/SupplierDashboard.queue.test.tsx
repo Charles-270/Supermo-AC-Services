@@ -203,13 +203,17 @@ describe('SupplierDashboard linking queue', () => {
     const productSelect = within(dialog).getByLabelText('Store product');
     fireEvent.change(productSelect, { target: { value: 'store-1' } });
 
-    fireEvent.change(within(dialog).getByLabelText('Unit price (GHS)'), { target: { value: '1200' } });
+    fireEvent.change(within(dialog).getByLabelText('Supplier base price (GHS)'), {
+      target: { value: '1200' },
+    });
     fireEvent.change(within(dialog).getByLabelText('On-hand stock'), { target: { value: '9' } });
 
     const addToQueueBtn = within(dialog).getByRole('button', { name: /add to queue/i });
     fireEvent.click(addToQueueBtn);
 
-    expect(await within(dialog).findByText('Test Coil Unit')).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText('Test Coil Unit', { selector: 'p' })
+    ).toBeInTheDocument();
 
     const linkProductsBtn = within(dialog).getByRole('button', { name: /link products/i });
     fireEvent.click(linkProductsBtn);

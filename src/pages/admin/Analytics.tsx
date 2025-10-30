@@ -4,7 +4,7 @@
  * Google Stitch-inspired design - October 2025
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,10 +35,12 @@ import {
   getTopProducts,
   getServiceTypeAnalytics,
   getPlatformStats,
+  getTopProductsTrend,
   type RevenueDataPoint,
   type UserGrowthDataPoint,
   type BookingTrendDataPoint,
   type TopProduct,
+  type TopProductTrendPoint,
   type ServiceTypeAnalytics as ServiceAnalytics,
   type PlatformStats,
 } from '@/services/analyticsService';
@@ -58,6 +60,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+const PRODUCT_TREND_COLORS = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+
 export default function Analytics() {
   const [timeRange, setTimeRange] = useState<'7' | '30' | '90'>('30');
   const [loading, setLoading] = useState(true);
@@ -69,19 +73,29 @@ export default function Analytics() {
   const [bookingTrendsData, setBookingTrendsData] = useState<BookingTrendDataPoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [serviceAnalytics, setServiceAnalytics] = useState<ServiceAnalytics[]>([]);
+  const [topProductsTrend, setTopProductsTrend] = useState<TopProductTrendPoint[]>([]);
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
       const days = parseInt(timeRange);
 
-      const [stats, revenue, userGrowth, bookings, products, services] = await Promise.all([
+      const [
+        stats,
+        revenue,
+        userGrowth,
+        bookings,
+        products,
+        services,
+        productsTrend,
+      ] = await Promise.all([
         getPlatformStats(),
         getRevenueAnalytics(days),
         getUserGrowthAnalytics(days),
         getBookingTrends(days),
         getTopProducts(10),
         getServiceTypeAnalytics(),
+        getTopProductsTrend(days, 5),
       ]);
 
       setPlatformStats(stats);
@@ -90,6 +104,7 @@ export default function Analytics() {
       setBookingTrendsData(bookings);
       setTopProducts(products);
       setServiceAnalytics(services);
+      setTopProductsTrend(productsTrend);
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
@@ -130,6 +145,59 @@ export default function Analytics() {
     const rows = data.map((row) => Object.values(row).join(','));
     return [headers, ...rows].join('\n');
   };
+
+  const productTrendSummary = useMemo(() => {
+    if (topProductsTrend.length === 0) {
+      return {
+        data: [] as Array<Record<string, number | string>>,
+        series: [] as Array<{ key: string; name: string; color: string }>,
+      };
+    }
+
+    const totals = new Map<string, { name: string; units: number }>();
+
+    topProductsTrend.forEach((point) => {
+      point.products.forEach((product) => {
+        if (!totals.has(product.productId)) {
+          totals.set(product.productId, { name: product.productName, units: 0 });
+        }
+        const entry = totals.get(product.productId)!;
+        entry.units += product.units;
+        entry.name = product.productName || entry.name;
+      });
+    });
+
+    const ranked = Array.from(totals.entries())
+      .sort((a, b) => b[1].units - a[1].units)
+      .slice(0, 5);
+
+    const topIds = ranked.map(([productId]) => productId);
+    const idToName = new Map(ranked.map(([productId, value]) => [productId, value.name]));
+
+    const chartData = topProductsTrend.map((point) => {
+      const row: Record<string, number | string> = { date: point.date };
+      topIds.forEach((productId) => {
+        row[productId] = 0;
+      });
+      point.products.forEach((product) => {
+        if (topIds.includes(product.productId)) {
+          row[product.productId] = product.units;
+          if (!idToName.has(product.productId)) {
+            idToName.set(product.productId, product.productName);
+          }
+        }
+      });
+      return row;
+    });
+
+    const series = topIds.map((productId, index) => ({
+      key: productId,
+      name: idToName.get(productId) ?? productId,
+      color: PRODUCT_TREND_COLORS[index % PRODUCT_TREND_COLORS.length],
+    }));
+
+    return { data: chartData, series };
+  }, [topProductsTrend]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -445,6 +513,45 @@ export default function Analytics() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Top Products Trend */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Top Products Trend
+                </CardTitle>
+                <CardDescription>Daily units sold for the leading products</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {productTrendSummary.data.length === 0 ? (
+                  <p className="text-center text-neutral-500 py-8">
+                    No sales data for the selected time range
+                  </p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={350}>
+                    <LineChart data={productTrendSummary.data}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tickFormatter={formatDate} />
+                      <YAxis />
+                      <Tooltip labelFormatter={(label) => formatDate(String(label))} />
+                      <Legend />
+                      {productTrendSummary.series.map((series) => (
+                        <Line
+                          key={series.key}
+                          type="monotone"
+                          dataKey={series.key}
+                          name={series.name}
+                          stroke={series.color}
+                          strokeWidth={2}
+                          dot={false}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
           </>
         )}
       </div>

@@ -244,6 +244,19 @@ service cloud.firestore {
       allow write: if isAdmin() || isAdminDb();
     }
 
+    // Aggregated analytics collections
+    match /analytics_daily/{dateKey} {
+      // Allow the analytics dashboard (admin) to read summaries; write restricted to admins
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isAdminDb();
+    }
+
+    match /analytics_top_products/{docId} {
+      // Allow dashboard widgets to read top products
+      allow read: if true;
+      allow write: if isAdmin() || isAdminDb();
+    }
+
     // Chat messages collection (for live support)
     match /chats/{chatId}/messages/{messageId} {
       // Users can read messages in their own chats

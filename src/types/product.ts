@@ -82,6 +82,7 @@ export type PaymentStatus =
   | 'pending'
   | 'processing'
   | 'completed'
+  | 'paid'
   | 'failed'
   | 'refunded';
 

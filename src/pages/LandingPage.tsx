@@ -108,12 +108,32 @@ export function LandingPage() {
             </h1>
           </div>
 
-          <nav className="hidden md:flex items-center space-x-6">
-            <a href="#services" className="hover:text-primary transition-colors text-base leading-none">Services</a>
-            <a href="#products" className="hover:text-primary transition-colors text-base leading-none">Products</a>
-            <a href="#training" className="hover:text-primary transition-colors text-base leading-none">Training</a>
+          <nav className="hidden md:flex items-center gap-8">
+            <a
+              href="#services"
+              className="inline-flex h-10 items-center text-base font-medium leading-none text-text-light transition-colors hover:text-primary dark:text-text-dark"
+            >
+              Services
+            </a>
+            <a
+              href="#products"
+              className="inline-flex h-10 items-center text-base font-medium leading-none text-text-light transition-colors hover:text-primary dark:text-text-dark"
+            >
+              Products
+            </a>
+            <a
+              href="#training"
+              className="inline-flex h-10 items-center text-base font-medium leading-none text-text-light transition-colors hover:text-primary dark:text-text-dark"
+            >
+              Training
+            </a>
             <PlatformDropdown onSelectPlatform={handlePlatformSelect} />
-            <a href="#about" className="hover:text-primary transition-colors text-base leading-none">About</a>
+            <a
+              href="#about"
+              className="inline-flex h-10 items-center text-base font-medium leading-none text-text-light transition-colors hover:text-primary dark:text-text-dark"
+            >
+              About
+            </a>
           </nav>
 
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>

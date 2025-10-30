@@ -52,20 +52,18 @@ export function PlatformDropdown({ onSelectPlatform }: PlatformDropdownProps) {
   }, []);
 
   return (
-    <div 
-      className="relative"
+    <div
+      className="relative inline-flex h-10 items-center"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       <button
-        className="hover:text-primary transition-colors inline-flex items-center gap-1 text-base leading-none"
+        type="button"
+        className="inline-flex h-full items-center gap-1.5 text-base font-medium leading-none text-text-light transition-colors hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:text-text-dark"
         onClick={() => setIsOpen(!isOpen)}
       >
         <span>Platform</span>
-        <MaterialIcon 
-          icon={isOpen ? "expand_less" : "expand_more"} 
-          size="sm" 
-        />
+        <MaterialIcon icon={isOpen ? 'expand_less' : 'expand_more'} size="sm" />
       </button>
 
       {isOpen && (
